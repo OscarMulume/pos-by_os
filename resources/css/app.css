@@ -1,0 +1,228 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════
+   ANIMATED GRADIENT BACKGROUND
+   ═══════════════════════════════════════════════════ */
+@keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.bg-animated-gradient {
+    background: linear-gradient(
+        135deg,
+        #f8fafc 0%,
+        #f1f5f9 25%,
+        #e2e8f5 50%,
+        #ede9fe 75%,
+        #f8fafc 100%
+    );
+    background-size: 400% 400%;
+    animation: gradientShift 20s ease infinite;
+}
+
+.dark .bg-animated-gradient {
+    background: linear-gradient(
+        135deg,
+        #0f172a 0%,
+        #1e293b 25%,
+        #1a1a2e 50%,
+        #16213e 75%,
+        #0f172a 100%
+    );
+    background-size: 400% 400%;
+    animation: gradientShift 20s ease infinite;
+}
+
+/* Subtle floating orbs for depth */
+.bg-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.bg-orb-1 {
+    width: 400px; height: 400px;
+    background: #6366f1;
+    top: -100px; left: -100px;
+    animation: orbFloat1 25s ease-in-out infinite;
+}
+
+.bg-orb-2 {
+    width: 350px; height: 350px;
+    background: #8b5cf6;
+    bottom: -80px; right: -80px;
+    animation: orbFloat2 30s ease-in-out infinite;
+}
+
+.bg-orb-3 {
+    width: 300px; height: 300px;
+    background: #f59e0b;
+    top: 50%; left: 50%;
+    animation: orbFloat3 20s ease-in-out infinite;
+}
+
+.dark .bg-orb-1 { background: #4f46e5; opacity: 0.1; }
+.dark .bg-orb-2 { background: #7c3aed; opacity: 0.1; }
+.dark .bg-orb-3 { background: #d97706; opacity: 0.08; }
+
+@keyframes orbFloat1 {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(80px, 40px); }
+    66% { transform: translate(-40px, 80px); }
+}
+
+@keyframes orbFloat2 {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(-60px, -30px); }
+    66% { transform: translate(30px, -60px); }
+}
+
+@keyframes orbFloat3 {
+    0%, 100% { transform: translate(-50%, -50%); }
+    50% { transform: translate(-30%, -70%); }
+}
+
+/* ═══════════════════════════════════════════════════
+   DARK MODE TOGGLE BUTTON
+   ═══════════════════════════════════════════════════ */
+.dark-toggle {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    border-radius: 13px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.dark-toggle-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 13px;
+    background-color: #cbd5e1;
+    transition: background-color 0.3s ease;
+}
+
+.dark .dark-toggle-track {
+    background-color: #475569;
+}
+
+.dark-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.dark .dark-toggle-thumb {
+    transform: translateX(22px);
+    background-color: #1e293b;
+}
+
+/* ═══════════════════════════════════════════════════
+   SCROLLBAR STYLING
+   ═══════════════════════════════════════════════════ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+}
+
+/* ═══════════════════════════════════════════════════
+   STATUS BADGES — ORDER WORKFLOW
+   ═══════════════════════════════════════════════════ */
+.status-en_cours {
+    @apply bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300;
+}
+
+.status-en_attente {
+    @apply bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300;
+}
+
+.status-payee {
+    @apply bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300;
+}
+
+.status-annulee {
+    @apply bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300;
+}
+
+/* ═══════════════════════════════════════════════════
+   ORDER CARD — VISUAL WORKFLOW
+   ═══════════════════════════════════════════════════ */
+.order-card {
+    @apply rounded-xl border-2 transition-all duration-300 cursor-pointer;
+}
+
+.order-card-en_cours {
+    @apply border-blue-300 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-950/30;
+    animation: pulse-blue 2s ease-in-out infinite;
+}
+
+.order-card-en_attente {
+    @apply border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30;
+    animation: pulse-amber 1.5s ease-in-out infinite;
+}
+
+.order-card-payee {
+    @apply border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20;
+}
+
+.order-card-annulee {
+    @apply border-red-200 bg-red-50/30 dark:border-red-800 dark:bg-red-950/20 opacity-70;
+}
+
+@keyframes pulse-blue {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3); }
+    50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+}
+
+@keyframes pulse-amber {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+    50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+}
+
+/* ═══════════════════════════════════════════════════
+   WORKFLOW PROGRESS BAR
+   ═══════════════════════════════════════════════════ */
+.workflow-step {
+    @apply flex items-center relative;
+}
+
+.workflow-step-circle {
+    @apply w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300;
+}
+
+.workflow-step-line {
+    @apply flex-1 h-1 rounded-full transition-all duration-500;
+}
+
+/* ═══════════════════════════════════════════════════
+   GLASS MORPHISM CARD
+   ═══════════════════════════════════════════════════ */
+.glass-card {
+    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/20 dark:border-slate-700/50;
+}
