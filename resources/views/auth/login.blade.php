@@ -31,11 +31,12 @@
         <form method="POST" action="{{ route('login') }}">
             @csrf
 
-            <!-- Username -->
+            <!-- Email ou Username -->
             <div class="mb-4">
-                <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus autocomplete="username"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                <label for="login" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email ou Username</label>
+                <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="email"
+                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="email@exemple.com ou username" />
             </div>
 
             <!-- Password -->
