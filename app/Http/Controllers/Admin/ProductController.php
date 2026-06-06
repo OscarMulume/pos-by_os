@@ -32,7 +32,7 @@ class ProductController extends Controller
         }
 
         $products = $query->orderBy('name')->paginate(30);
-        $categories = Category::where('restaurant_id', $restaurantId)->where('is_active', true)->orderBy('name')->get();
+        $categories = Category::where('restaurant_id', $restaurantId)->where('is_active', true)->orderBy('display_order', 'asc')->orderBy('name', 'asc')->get();
 
         return view('admin.products.index', compact('products', 'categories'));
     }
@@ -40,7 +40,7 @@ class ProductController extends Controller
     public function create(Request $request): View
     {
         $restaurantId = $request->user()->restaurant_id;
-        $categories = Category::where('restaurant_id', $restaurantId)->where('is_active', true)->orderBy('name')->get();
+        $categories = Category::where('restaurant_id', $restaurantId)->where('is_active', true)->orderBy('display_order', 'asc')->orderBy('name', 'asc')->get();
         return view('admin.products.create', compact('categories'));
     }
 
@@ -52,14 +52,17 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'cost_price' => 'nullable|numeric|min:0',
             'category_id' => 'nullable|exists:categories,id',
-            'image' => 'nullable|image|mimes:png,jpg,jpeg,webp|max=2048',
+            'image' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
             'track_inventory' => 'boolean',
             'stock_quantity' => 'nullable|integer|min:0',
-            'low_stock_threshold' => 'nullable|integer|min=0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'sort_order' => 'nullable|integer|min:0',
+            'prep_time_minutes' => 'nullable|integer|min:1|max:120',
+            'kitchen_route' => 'nullable|in:kitchen,bar,counter',
             'variants' => 'nullable|array',
-            'variants.*.name' => 'required|string|max=100',
+            'variants.*.name' => 'required|string|max:100',
             'variants.*.options' => 'nullable|array',
-            'variants.*.options.*.name' => 'required|string|max=100',
+            'variants.*.options.*.name' => 'required|string|max:100',
             'variants.*.options.*.price_adjustment' => 'nullable|numeric',
         ]);
 
@@ -76,6 +79,9 @@ class ProductController extends Controller
             'stock_quantity' => $validated['stock_quantity'] ?? 0,
             'low_stock_threshold' => $validated['low_stock_threshold'] ?? 5,
             'is_available' => true,
+            'sort_order' => $validated['sort_order'] ?? 0,
+            'prep_time_minutes' => $validated['prep_time_minutes'] ?? 15,
+            'kitchen_route' => $validated['kitchen_route'] ?? 'kitchen',
         ]);
 
         // Créer les variantes
@@ -109,7 +115,7 @@ class ProductController extends Controller
     public function edit(Request $request, Product $product): View
     {
         $restaurantId = $request->user()->restaurant_id;
-        $categories = Category::where('restaurant_id', $restaurantId)->where('is_active', true)->orderBy('name')->get();
+        $categories = Category::where('restaurant_id', $restaurantId)->where('is_active', true)->orderBy('display_order', 'asc')->orderBy('name', 'asc')->get();
         $product->load(['variants.options']);
         return view('admin.products.edit', compact('product', 'categories'));
     }

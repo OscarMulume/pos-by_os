@@ -17,8 +17,8 @@ class CategoryController extends Controller
         $restaurantId = $request->user()->restaurant_id;
 
         $categories = Category::where('restaurant_id', $restaurantId)
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->orderBy('display_order', 'asc')
+            ->orderBy('name', 'asc')
             ->get();
 
         return view('admin.categories.index', compact('categories'));
@@ -38,29 +38,66 @@ class CategoryController extends Controller
 
         return redirect()
             ->route('admin.categories.index')
-            ->with('success', 'Category created successfully.');
+            ->with('success', 'Catégorie créée avec succès.');
     }
 
-    public function edit(Category $category): View
+    public function edit(Request $request, Category $category): View
     {
+        // Sécurité : vérifier l'appartenance au restaurant
+        if ($category->restaurant_id !== $request->user()->restaurant_id) {
+            abort(403, 'Accès non autorisé.');
+        }
+
         return view('admin.categories.edit', compact('category'));
     }
 
     public function update(StoreCategoryRequest $request, Category $category): RedirectResponse
     {
+        // Sécurité : vérifier l'appartenance au restaurant
+        if ($category->restaurant_id !== $request->user()->restaurant_id) {
+            abort(403, 'Accès non autorisé.');
+        }
+
         $category->update($request->validated());
 
         return redirect()
             ->route('admin.categories.index')
-            ->with('success', 'Category updated successfully.');
+            ->with('success', 'Catégorie mise à jour avec succès.');
     }
 
-    public function destroy(Category $category): RedirectResponse
+    public function destroy(Request $request, Category $category): RedirectResponse
     {
+        // Sécurité : vérifier l'appartenance au restaurant
+        if ($category->restaurant_id !== $request->user()->restaurant_id) {
+            abort(403, 'Accès non autorisé.');
+        }
+
+        // Bloquer la suppression si des produits sont liés
+        if ($category->products()->exists()) {
+            return redirect()
+                ->route('admin.categories.index')
+                ->with('error', 'Impossible de supprimer cette catégorie : des produits y sont encore associés. Réassignez ou supprimez d\'abord les produits.');
+        }
+
         $category->delete();
 
         return redirect()
             ->route('admin.categories.index')
-            ->with('success', 'Category deleted successfully.');
+            ->with('success', 'Catégorie supprimée avec succès.');
+    }
+
+    public function toggleStatus(Request $request, Category $category): RedirectResponse
+    {
+        // Sécurité : vérifier l'appartenance au restaurant
+        if ($category->restaurant_id !== $request->user()->restaurant_id) {
+            abort(403, 'Accès non autorisé.');
+        }
+
+        $category->update(['is_active' => !$category->is_active]);
+        $status = $category->is_active ? 'activée' : 'désactivée';
+
+        return redirect()
+            ->route('admin.categories.index')
+            ->with('success', "Catégorie « {$category->name} » {$status}.");
     }
 }

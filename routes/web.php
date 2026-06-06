@@ -124,6 +124,7 @@ Route::middleware('auth')->group(function () {
 
         Route::resource('products', ProductController::class);
         Route::resource('categories', CategoryController::class)->except(['show']);
+        Route::patch('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
         Route::resource('users', UserController::class)->except(['show']);
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
         Route::get('/transactions/{order}', [TransactionController::class, 'show'])->name('transactions.show');
@@ -133,6 +134,7 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,manager,super_admin')->group(function () {
             Route::resource('restaurants', RestaurantController::class);
             Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+            Route::get('/reports/export-pdf', [ReportController::class, 'exportPdf'])->name('reports.export-pdf');
             Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
             Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
             Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');

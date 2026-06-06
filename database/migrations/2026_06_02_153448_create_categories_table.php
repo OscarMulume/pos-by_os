@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('name', 50);
             $table->string('icon', 100)->nullable();
             $table->string('color', 7)->nullable();
-            $table->unsignedInteger('sort_order')->default(0);
+            $table->unsignedInteger('display_order')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

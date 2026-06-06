@@ -75,13 +75,13 @@
                 @enderror
             </div>
 
-            <!-- Sort Order -->
+            <!-- Display Order -->
             <div>
-                <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-1">Ordre d'affichage</label>
-                <input type="number" id="sort_order" name="sort_order" value="{{ old('sort_order', 0) }}" min="0"
-                       class="w-32 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('sort_order') border-red-500 @enderror">
+                <label for="display_order" class="block text-sm font-medium text-gray-700 mb-1">Ordre d'affichage</label>
+                <input type="number" id="display_order" name="display_order" value="{{ old('display_order', 0) }}" min="0"
+                       class="w-32 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition @error('display_order') border-red-500 @enderror">
                 <p class="mt-1 text-xs text-gray-400">Les catégories avec un numéro plus bas apparaissent en premier.</p>
-                @error('sort_order')
+                @error('display_order')
                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                 @enderror
             </div>

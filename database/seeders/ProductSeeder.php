@@ -76,9 +76,35 @@ class ProductSeeder extends Seeder
                         'cost_price' => $item['cost'],
                         'is_available' => true,
                         'sort_order' => $index,
+                        'prep_time_minutes' => $this->getPrepTime($catIndex),
+                        'kitchen_route' => $this->getKitchenRoute($catIndex),
                     ]);
                 }
             }
         }
+    }
+
+    private function getPrepTime(int $catIndex): int
+    {
+        return match ($catIndex) {
+            0 => 25, // Plats Principaux
+            4 => 15, // Accompagnements
+            1 => 2,  // Boissons
+            2 => 10, // Entrées
+            3 => 8,  // Desserts
+            5 => 3,  // Alcools
+            6 => 5,  // Café & Thé
+            default => 15,
+        };
+    }
+
+    private function getKitchenRoute(int $catIndex): string
+    {
+        return match ($catIndex) {
+            0, 2, 4 => 'kitchen', // Plats, Entrées, Accompagnements → KDS
+            1, 5, 6 => 'bar',     // Boissons, Alcools, Café → Bar
+            3 => 'counter',        // Desserts → Comptoir
+            default => 'kitchen',
+        };
     }
 }

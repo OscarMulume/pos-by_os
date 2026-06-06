@@ -48,7 +48,7 @@
                             </div>
                         </td>
                         <td class="px-5 py-4 text-center">
-                            <span class="text-gray-700 font-medium">{{ $category->sort_order }}</span>
+                            <span class="text-gray-700 font-medium">{{ $category->display_order }}</span>
                         </td>
                         <td class="px-5 py-4 text-center">
                             @if($category->is_active)
@@ -63,6 +63,24 @@
                         </td>
                         <td class="px-5 py-4 text-right">
                             <div class="flex items-center justify-end space-x-2">
+                                <form action="{{ route('admin.categories.toggle-status', $category) }}" method="POST" class="inline">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit"
+                                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium {{ $category->is_active ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-green-700 bg-green-50 hover:bg-green-100' }} rounded-lg transition">
+                                        @if($category->is_active)
+                                            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                            </svg>
+                                            Désactiver
+                                        @else
+                                            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            Activer
+                                        @endif
+                                    </button>
+                                </form>
                                 <a href="{{ route('admin.categories.edit', $category) }}"
                                    class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
                                     <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

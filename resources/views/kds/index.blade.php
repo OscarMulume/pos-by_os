@@ -9,10 +9,15 @@
     <style>
         html, body { height: 100%; overflow: hidden; }
         @keyframes urgentPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-            50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
         }
-        .urgent-pulse { animation: urgentPulse 1.5s ease-in-out infinite; }
+        .urgent-pulse { animation: urgentPulse 1s ease-in-out infinite; }
+        @keyframes gentlePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .gentle-pulse { animation: gentlePulse 2s ease-in-out infinite; }
     </style>
 </head>
 <body class="h-full bg-gray-900 text-white" x-data="kds()" x-init="init()">
@@ -32,12 +37,8 @@
                 <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
                 <span class="text-gray-400" x-text="enPrepCount + ' en préparation'"></span>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                <span class="text-gray-400" x-text="pretCount + ' prêts'"></span>
-            </div>
             <span class="text-gray-500">|</span>
-            <span class="text-gray-300 font-mono text-lg" x-text="clock" x-data="{ clock: '' }" x-init="setInterval(() => { clock = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }, 1000); clock = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});"></span>
+            <span class="text-gray-300 font-mono text-lg" x-text="clock"></span>
         </div>
     </header>
 
@@ -56,29 +57,39 @@
             <div class="flex-1 overflow-y-auto p-3 space-y-3">
                 <template x-for="order in enAttenteOrders" :key="order.id">
                     <div class="bg-gray-800 rounded-xl border border-yellow-500/30 p-4 cursor-pointer hover:border-yellow-400/50 transition-all"
-                         :class="order.kitchen_wait_mins >= 25 ? 'urgent-pulse border-red-500' : ''"
+                         :class="isUrgent(order) ? 'urgent-pulse border-red-500' : (isWarning(order) ? 'gentle-pulse' : '')"
                          @click="startPrep(order)">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-2">
                                 <span class="text-lg font-bold text-white" x-text="order.table_name || 'À emporter'"></span>
                                 <span class="text-xs text-gray-500" x-text="order.order_number"></span>
                             </div>
+                            <!-- Minuteur -->
                             <div class="flex items-center gap-2">
                                 <span class="text-xs px-2 py-0.5 rounded-full font-bold"
-                                      :class="{
-                                          'bg-green-500/20 text-green-400': order.kitchen_wait_mins < 15,
-                                          'bg-yellow-500/20 text-yellow-400': order.kitchen_wait_mins >= 15 && order.kitchen_wait_mins < 25,
-                                          'bg-red-500/20 text-red-400': order.kitchen_wait_mins >= 25
-                                      }"
-                                      x-text="order.kitchen_wait_mins + ' min'"></span>
+                                      :class="getTimerClass(order)"
+                                      x-text="getTimerDisplay(order)"></span>
                             </div>
                         </div>
-                        <div class="space-y-1 mb-3">
+                        <!-- Items avec prep_time individuel -->
+                        <div class="space-y-1.5 mb-3">
                             <template x-for="item in order.items" :key="item.id">
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-gray-300"><span class="font-bold text-white" x-text="item.quantity + '×'"></span> <span x-text="item.product_name"></span></span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-white" x-text="item.quantity + '×'"></span>
+                                        <span class="text-gray-300" x-text="item.product_name"></span>
+                                    </div>
+                                    <span class="text-xs px-1.5 py-0.5 rounded"
+                                          :class="getItemTimerClass(order, item)"
+                                          x-text="item.prep_time + ' min'"></span>
                                 </div>
+                                <p class="text-xs text-orange-300/70 ml-4" x-show="item.notes" x-text="'📝 ' + item.notes"></p>
                             </template>
+                        </div>
+                        <!-- Bar/Counter indicators -->
+                        <div class="flex gap-2 mb-2" x-show="order.has_bar_items || order.has_counter_items">
+                            <span class="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300" x-show="order.has_bar_items">🍸 Bar</span>
+                            <span class="text-xs px-2 py-0.5 rounded bg-gray-500/20 text-gray-300" x-show="order.has_counter_items">📦 Comptoir</span>
                         </div>
                         <div class="flex items-center justify-between pt-2 border-t border-gray-700">
                             <span class="text-xs text-gray-500" x-text="order.cashier_name"></span>
@@ -107,7 +118,7 @@
             <div class="flex-1 overflow-y-auto p-3 space-y-3">
                 <template x-for="order in enPrepOrders" :key="order.id">
                     <div class="bg-gray-800 rounded-xl border border-blue-500/30 p-4 cursor-pointer hover:border-blue-400/50 transition-all"
-                         :class="order.kitchen_wait_mins >= 25 ? 'urgent-pulse border-red-500' : ''"
+                         :class="isUrgent(order) ? 'urgent-pulse border-red-500' : (isWarning(order) ? 'gentle-pulse' : '')"
                          @click="markReady(order)">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-2">
@@ -116,19 +127,22 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="text-xs px-2 py-0.5 rounded-full font-bold"
-                                      :class="{
-                                          'bg-green-500/20 text-green-400': order.kitchen_wait_mins < 15,
-                                          'bg-yellow-500/20 text-yellow-400': order.kitchen_wait_mins >= 15 && order.kitchen_wait_mins < 25,
-                                          'bg-red-500/20 text-red-400': order.kitchen_wait_mins >= 25
-                                      }"
-                                      x-text="order.kitchen_wait_mins + ' min'"></span>
+                                      :class="getTimerClass(order)"
+                                      x-text="getTimerDisplay(order)"></span>
                             </div>
                         </div>
-                        <div class="space-y-1 mb-3">
+                        <div class="space-y-1.5 mb-3">
                             <template x-for="item in order.items" :key="item.id">
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-gray-300"><span class="font-bold text-white" x-text="item.quantity + '×'"></span> <span x-text="item.product_name"></span></span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-white" x-text="item.quantity + '×'"></span>
+                                        <span class="text-gray-300" x-text="item.product_name"></span>
+                                    </div>
+                                    <span class="text-xs px-1.5 py-0.5 rounded"
+                                          :class="getItemTimerClass(order, item)"
+                                          x-text="item.prep_time + ' min'"></span>
                                 </div>
+                                <p class="text-xs text-orange-300/70 ml-4" x-show="item.notes" x-text="'📝 ' + item.notes"></p>
                             </template>
                         </div>
                         <div class="flex items-center justify-between pt-2 border-t border-gray-700">
@@ -145,39 +159,9 @@
                 </div>
             </div>
         </div>
-
-        <!-- Column: PRÊT -->
-        <div class="flex-1 flex flex-col min-w-0 bg-green-500/5 rounded-xl border border-green-500/20">
-            <div class="px-4 py-3 border-b border-green-500/20 flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span class="text-sm font-bold text-green-400 uppercase tracking-wider">Prêt à Servir</span>
-                </div>
-                <span class="text-xs font-bold text-green-400 bg-green-500/20 px-2.5 py-1 rounded-full" x-text="pretOrders.length"></span>
-            </div>
-            <div class="flex-1 overflow-y-auto p-3 space-y-3">
-                <template x-for="order in pretOrders" :key="order.id">
-                    <div class="bg-gray-800/50 rounded-xl border border-green-500/20 p-4 opacity-70">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-lg font-bold text-green-400" x-text="order.table_name || 'À emporter'"></span>
-                            <span class="text-xs text-green-500 font-medium">✓ Prêt</span>
-                        </div>
-                        <div class="space-y-1">
-                            <template x-for="item in order.items" :key="item.id">
-                                <div class="text-sm text-gray-400"><span class="font-bold" x-text="item.quantity + '×'"></span> <span x-text="item.product_name"></span></div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-                <div x-show="pretOrders.length === 0" class="flex flex-col items-center justify-center h-40 text-gray-600">
-                    <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/></svg>
-                    <p class="text-sm">Aucune commande prête</p>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Notification sonore (optionnelle) -->
+    <!-- Notification sonore -->
     <audio id="kds-notify" preload="auto">
         <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQo6l9/Ss2QdBz2Y3dKyaB8F" type="audio/wav">
     </audio>
@@ -187,16 +171,22 @@
         return {
             orders: @json($kitchenOrders ?? []),
             clock: '',
+            now: Date.now(),
 
             get enAttenteOrders() { return this.orders.filter(o => o.kitchen_status === 'en_attente'); },
             get enPrepOrders() { return this.orders.filter(o => o.kitchen_status === 'en_preparation'); },
-            get pretOrders() { return this.orders.filter(o => o.kitchen_status === 'pret'); },
             get enAttenteCount() { return this.enAttenteOrders.length; },
             get enPrepCount() { return this.enPrepOrders.length; },
-            get pretCount() { return this.pretOrders.length; },
 
             init() {
-                // Poll toutes les 5 secondes
+                // Horloge
+                setInterval(() => {
+                    this.clock = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                    this.now = Date.now();
+                }, 1000);
+                this.clock = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+                // Polling toutes les 5s
                 setInterval(() => this.pollOrders(), 5000);
             },
 
@@ -210,7 +200,6 @@
                         if (data.orders) {
                             const hadEnAttente = this.enAttenteCount;
                             this.orders = data.orders;
-                            // Notification sonore si nouvelle commande
                             if (this.enAttenteCount > hadEnAttente) {
                                 const audio = document.getElementById('kds-notify');
                                 if (audio) audio.play().catch(() => {});
@@ -220,6 +209,52 @@
                 } catch(e) { console.error('KDS poll error:', e); }
             },
 
+            // ── Minuteur dynamique ──
+            getElapsedMinutes(order) {
+                if (!order.sent_to_kitchen_at) return 0;
+                const sent = new Date(order.sent_to_kitchen_at);
+                return Math.floor((this.now - sent.getTime()) / 60000);
+            },
+
+            getTimerDisplay(order) {
+                const elapsed = this.getElapsedMinutes(order);
+                const maxPrep = order.max_prep_time || 15;
+                const remaining = maxPrep - elapsed;
+                if (remaining > 0) return remaining + ' min restantes';
+                return '+' + Math.abs(remaining) min dépassé';
+            },
+
+            getTimerClass(order) {
+                const elapsed = this.getElapsedMinutes(order);
+                const maxPrep = order.max_prep_time || 15;
+                const ratio = elapsed / maxPrep;
+                if (ratio >= 1.0) return 'bg-red-500/20 text-red-400';
+                if (ratio >= 0.6) return 'bg-yellow-500/20 text-yellow-400';
+                return 'bg-green-500/20 text-green-400';
+            },
+
+            getItemTimerClass(order, item) {
+                const elapsed = this.getElapsedMinutes(order);
+                const prepTime = item.prep_time || 15;
+                const ratio = elapsed / prepTime;
+                if (ratio >= 1.0) return 'bg-red-500/20 text-red-400';
+                if (ratio >= 0.6) return 'bg-yellow-500/20 text-yellow-400';
+                return 'bg-green-500/20 text-green-400';
+            },
+
+            isUrgent(order) {
+                const elapsed = this.getElapsedMinutes(order);
+                const maxPrep = order.max_prep_time || 15;
+                return elapsed >= maxPrep;
+            },
+
+            isWarning(order) {
+                const elapsed = this.getElapsedMinutes(order);
+                const maxPrep = order.max_prep_time || 15;
+                return elapsed >= maxPrep * 0.6 && elapsed < maxPrep;
+            },
+
+            // ── Actions ──
             async startPrep(order) {
                 try {
                     const resp = await fetch(`/kds/order/${order.id}/start-prep`, {
@@ -242,8 +277,8 @@
                     });
                     const data = await resp.json();
                     if (data.success) {
-                        const o = this.orders.find(o => o.id === order.id);
-                        if (o) o.kitchen_status = 'pret';
+                        // Retirer de la liste KDS
+                        this.orders = this.orders.filter(o => o.id !== order.id);
                     }
                 } catch(e) { console.error(e); }
             }

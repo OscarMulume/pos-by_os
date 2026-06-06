@@ -90,13 +90,24 @@
             </div>
 
             <!-- Sort order & Available -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-1">Ordre d'affichage</label>
                     <input type="number" name="sort_order" id="sort_order" value="{{ old('sort_order', 0) }}" min="0"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('sort_order') border-red-500 focus:ring-red-500 focus:border-red-500 @enderror"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('sort_order') border-red-500 @enderror"
                            placeholder="0">
                     @error('sort_order')
+                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <!-- Prep time -->
+                <div>
+                    <label for="prep_time_minutes" class="block text-sm font-medium text-gray-700 mb-1">Temps préparation (min)</label>
+                    <input type="number" name="prep_time_minutes" id="prep_time_minutes" value="{{ old('prep_time_minutes', 15) }}" min="1" max="120"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('prep_time_minutes') border-red-500 @enderror"
+                           placeholder="15">
+                    <p class="mt-1 text-xs text-gray-400">Temps estimé pour le minuteur KDS</p>
+                    @error('prep_time_minutes')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
@@ -107,10 +118,22 @@
                                class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                         <span class="ml-2 text-sm text-gray-700">Produit disponible</span>
                     </label>
-                    @error('is_available')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
                 </div>
+            </div>
+
+            <!-- Routage cuisine -->
+            <div>
+                <label for="kitchen_route" class="block text-sm font-medium text-gray-700 mb-1">Destination en cuisine</label>
+                <select name="kitchen_route" id="kitchen_route"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('kitchen_route') border-red-500 @enderror">
+                    <option value="kitchen" {{ old('kitchen_route', 'kitchen') == 'kitchen' ? 'selected' : '' }}>🍳 Cuisine (KDS) — Plats, Entrées</option>
+                    <option value="bar" {{ old('kitchen_route') == 'bar' ? 'selected' : '' }}>🍸 Bar — Boissons, Cocktails</option>
+                    <option value="counter" {{ old('kitchen_route') == 'counter' ? 'selected' : '' }}>📦 Comptoir — À emporter, Desserts</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-400">Où ce produit doit-il être préparé/servi ?</p>
+                @error('kitchen_route')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                @enderror
             </div>
 
             <!-- Image -->

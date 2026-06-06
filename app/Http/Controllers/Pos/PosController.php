@@ -29,8 +29,8 @@ class PosController extends Controller
 
         $categories = Category::where('restaurant_id', $restaurantId)
             ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->orderBy('display_order', 'asc')
+            ->orderBy('name', 'asc')
             ->get();
 
         $products = Product::with('category')

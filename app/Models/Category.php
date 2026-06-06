@@ -12,7 +12,7 @@ class Category extends Model
     use HasFactory;
 
     protected $fillable = [
-        'restaurant_id', 'name', 'icon', 'color', 'sort_order', 'is_active',
+        'restaurant_id', 'name', 'icon', 'color', 'display_order', 'is_active',
     ];
 
     protected $casts = [
@@ -36,6 +36,6 @@ class Category extends Model
 
     public function scopeOrdered($query)
     {
-        return $query->orderBy('sort_order')->orderBy('name');
+        return $query->orderBy('display_order')->orderBy('name');
     }
 }

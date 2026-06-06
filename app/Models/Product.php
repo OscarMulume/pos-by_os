@@ -13,7 +13,7 @@ class Product extends Model
 
     protected $fillable = [
         'restaurant_id', 'category_id', 'name', 'description',
-        'price', 'cost_price', 'image_path', 'sort_order', 'is_available',
+        'price', 'cost_price', 'image_path', 'sort_order', 'prep_time_minutes', 'kitchen_route', 'is_available',
         'stock_quantity', 'low_stock_threshold', 'track_inventory',
     ];
 
@@ -68,6 +68,33 @@ class Product extends Model
     {
         return $query->where('track_inventory', true)
             ->whereColumn('stock_quantity', '<=', 'low_stock_threshold');
+    }
+
+    // ── Routage cuisine ──
+
+    public function goesToKitchen(): bool
+    {
+        return $this->kitchen_route === 'kitchen';
+    }
+
+    public function goesToBar(): bool
+    {
+        return $this->kitchen_route === 'bar';
+    }
+
+    public function staysAtCounter(): bool
+    {
+        return $this->kitchen_route === 'counter';
+    }
+
+    public function getKitchenRouteLabel(): string
+    {
+        return match ($this->kitchen_route) {
+            'kitchen' => 'Cuisine (KDS)',
+            'bar' => 'Bar',
+            'counter' => 'Comptoir',
+            default => 'Cuisine',
+        };
     }
 
     public function getMarginAttribute(): float

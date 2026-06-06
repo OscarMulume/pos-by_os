@@ -52,6 +52,13 @@ class OrderService
 
             foreach ($data['items'] as $item) {
                 $product = Product::findOrFail($item['product_id']);
+                $kitchenRoute = $product->kitchen_route ?? 'kitchen';
+                $itemKitchenStatus = match ($kitchenRoute) {
+                    'kitchen' => 'en_attente',
+                    'bar' => 'bar',
+                    'counter' => 'comptoir',
+                    default => 'en_attente',
+                };
                 OrderItem::create([
                     'order_id'      => $order->id,
                     'product_id'    => $item['product_id'],
@@ -60,6 +67,8 @@ class OrderService
                     'price_at_sale' => $product->price,
                     'subtotal'      => $item['quantity'] * $product->price,
                     'notes'         => $item['notes'] ?? null,
+                    'kitchen_status'=> $itemKitchenStatus,
+                    'kitchen_route' => $kitchenRoute,
                 ]);
             }
 

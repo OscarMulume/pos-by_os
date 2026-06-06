@@ -26,7 +26,7 @@ class CategorySeeder extends Seeder
                     'name' => $cat['name'],
                     'icon' => $cat['icon'],
                     'color' => $cat['color'],
-                    'sort_order' => $index,
+                    'display_order' => $index,
                     'is_active' => true,
                 ]);
             }

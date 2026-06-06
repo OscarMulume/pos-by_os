@@ -23,7 +23,7 @@
             }
         </style>
     </head>
-    <body class="font-sans antialiased h-full" x-data="{ dark: localStorage.getItem('darkMode') === 'true', sidebarOpen: false }" :class="{ 'dark': dark }" x-init="$watch('dark', val => localStorage.setItem('darkMode', val))">
+    <body class="font-sans antialiased h-full" x-data="{ dark: localStorage.getItem('darkMode') === 'true' }" :class="{ 'dark': dark }">
         <!-- Floating orbs (subtle on POS) -->
         <div class="bg-orb bg-orb-1 opacity-50"></div>
         <div class="bg-orb bg-orb-2 opacity-50"></div>
