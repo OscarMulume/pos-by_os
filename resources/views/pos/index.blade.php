@@ -2,6 +2,7 @@
 
 @section('content')
 <div x-data="posWorkflow()" x-init="init()">
+
 <!-- ═══════════════════════════════════════════════════════
      MODALE BLOQUANTE DE SÉLECTION DE TABLE
      ═══════════════════════════════════════════════════════ -->
@@ -20,11 +21,12 @@
         <p class="text-gray-500 text-sm mb-8">Choisissez la table à servir ou "À emporter"</p>
 
         <!-- Legende couleurs -->
-        <div class="flex justify-center gap-4 mb-6 text-xs">
+        <div class="flex justify-center gap-4 mb-6 text-xs flex-wrap">
             <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-green-500"></span> Libre</span>
             <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> En cuisine</span>
             <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-blue-500"></span> À encaisser</span>
             <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-red-500"></span> Occupée</span>
+            <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-red-600 animate-ping"></span> SLA dépassé</span>
         </div>
 
         <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-6">
@@ -32,11 +34,9 @@
                 @php
                     $tc = $tbl->getStatusColor();
                     $tLabel = $tbl->getStatusLabel();
-                    // Une table est sélectionnable si elle est libre OU si elle a une commande active
-                    // (pour ajouter des items ou imprimer l'addition)
                     $isClickable = $tbl->isAvailable() || in_array($tbl->status, ['kitchen_processing', 'served_unpaid', 'occupied']);
                 @endphp
-                <button @click="selectTable({{ $tbl->id }}, '{{ $tbl->name }}')"
+                <button @click="selectTable({{ $tbl->id }}, '{{ $tbl->name }}', {{ $tbl->currentOrder ? $tbl->currentOrder->id : 'null' }}, '{{ $tbl->currentOrder ? $tbl->currentOrder->order_number : '' }}', {{ $tbl->currentOrder ? $tbl->currentOrder->total_amount : 0 }}, '{{ $tbl->currentOrder ? $tbl->total_amount : '' }}')"
                         class="p-4 rounded-xl border-2 transition-all active:scale-95 min-h-[80px] relative
                                {{ $tc === 'green' ? 'border-green-500/50 bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:border-green-400' : '' }}
                                {{ $tc === 'yellow' ? 'border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 hover:border-yellow-400' : '' }}
@@ -44,7 +44,6 @@
                                {{ $tc === 'red' ? 'border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:border-red-400' : '' }}
                                {{ $tbl->isSlaBreached(30) ? 'animate-pulse ring-2 ring-red-500 ring-offset-2 ring-offset-slate-900' : '' }}"
                         {{ !$isClickable ? 'disabled' : '' }}>
-                    <!-- Badge SLA dépassé -->
                     @if($tbl->isSlaBreached(30))
                         <div class="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center z-10">
                             <span class="text-white text-xs font-bold">!</span>
@@ -58,7 +57,6 @@
                             {{ $tLabel }}
                         </span>
                     </div>
-                    <!-- Chronomètre SLA -->
                     @if($tbl->getWaitMinutes() !== null && in_array($tbl->status, ['kitchen_processing', 'served_unpaid']))
                         <div class="mt-1">
                             <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold
@@ -70,15 +68,71 @@
                         </div>
                     @endif
                     @if($tbl->currentOrder)
-                        <div class="text-[10px] mt-1 text-gray-500">#{{ $tbl->currentOrder->order_number }}</div>
+                        <div class="text-[10px] mt-1 text-gray-500">
+                            #{{ $tbl->currentOrder->order_number }} — {{ number_format($tbl->currentOrder->total_amount, 0, ',', '.') }} {{ $restaurant->currency ?? 'FC' }}
+                        </div>
                     @endif
                 </button>
             @endforeach
         </div>
-        <button @click="selectTable(null, 'À emporter')"
+        <button @click="selectTable(null, 'À emporter', null, null, 0, '')"
                 class="px-8 py-3 rounded-xl border-2 border-gray-600 text-gray-300 hover:bg-gray-800 hover:border-gray-500 transition-all active:scale-95">
             🛍️ À emporter
         </button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANNEAU D'ACTIONS TABLE (si commande active)
+     ═══════════════════════════════════════════════════════ -->
+<div x-show="tableSelected && activeOrderId"
+     x-transition
+     class="fixed top-0 left-0 right-0 z-40 bg-slate-800/95 backdrop-blur-md border-b border-slate-700 px-4 py-3">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+        <!-- Info commande -->
+        <div class="flex items-center gap-4">
+            <div class="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                <span x-text="activeTableName"></span>
+            </div>
+            <div class="text-white text-sm">
+                <span class="text-gray-400">Ticket:</span>
+                <span class="font-bold" x-text="activeOrderNumber"></span>
+            </div>
+            <div class="text-white text-sm">
+                <span class="text-gray-400">Total:</span>
+                <span class="font-bold text-green-400" x-text="formatMoney(activeOrderTotal)"></span>
+            </div>
+            <div class="text-white text-sm">
+                <span class="text-gray-400">Statut:</span>
+                <span class="px-2 py-0.5 rounded text-xs font-bold"
+                      :class="activeOrderStatus === 'sent_to_kitchen' ? 'bg-yellow-500/20 text-yellow-400' : (activeOrderStatus === 'ready' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400')"
+                      x-text="activeOrderStatusLabel"></span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-2">
+            <!-- Imprimer l'addition (Proforma) -->
+            <button @click="printProforma(activeOrderId)"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2">
+                🖨️ Imprimer
+            </button>
+            <!-- Payer la note -->
+            <button @click="openPaymentModal()"
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2">
+                💳 Payer
+            </button>
+            <!-- WhatsApp -->
+            <button @click="sendViaWhatsApp(activeOrderId, activeOrderNumber, '{{ $restaurant->name ?? '' }}')"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2">
+                📱 WhatsApp
+            </button>
+            <!-- Retour plan de salle -->
+            <button @click="returnToFloorPlan()"
+                    class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-medium transition flex items-center gap-2">
+                ← Tables
+            </button>
+        </div>
     </div>
 </div>
 
@@ -90,35 +144,22 @@
      x-transition:enter-start="opacity-0"
      x-transition:enter-end="opacity-100"
      class="flex h-full gap-0"
+     :class="activeOrderId ? 'pt-16' : ''"
      style="display: none;">
 
     <!-- LEFT: PRODUITS -->
     <div class="flex-1 flex flex-col min-w-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border-r border-gray-200/50 dark:border-slate-700/50">
-        <!-- Barre info table + boutons actions -->
+        <!-- Barre info table -->
         <div class="bg-slate-800 dark:bg-slate-950 text-white px-4 py-2 flex items-center justify-between flex-shrink-0">
             <div class="flex items-center gap-3">
                 <button @click="returnToFloorPlan()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                    Plan de salle
+                    Tables
                 </button>
                 <span class="text-sm font-bold" x-text="selectedTableName"></span>
                 <span class="text-xs text-gray-400" x-text="'(' + cartItemCount + ' articles)'"></span>
             </div>
-            <div class="flex items-center gap-2">
-                <!-- Bouton Proforma (si commande active) -->
-                <button x-show="currentOrderId" @click="printProforma(currentOrderId)"
-                        class="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-lg transition flex items-center gap-1"
-                        title="Imprimer l'addition (proforma)">
-                    🖨️ Addition
-                </button>
-                <!-- Bouton WhatsApp (si commande active) -->
-                <button x-show="currentOrderId" @click="sendViaWhatsApp(currentOrderId, currentOrderNumber, '{{ $restaurant->name ?? '' }}')"
-                        class="text-xs bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg transition flex items-center gap-1"
-                        title="Envoyer le reçu via WhatsApp">
-                    📱 WhatsApp
-                </button>
-                <button @click="changeTable()" class="text-xs text-gray-400 hover:text-white underline transition">Changer de table</button>
-            </div>
+            <button @click="changeTable()" class="text-xs text-gray-400 hover:text-white underline transition">Changer</button>
         </div>
         <!-- Category Tabs -->
         <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-slate-700/50 px-3 py-2 flex-shrink-0">
@@ -141,10 +182,8 @@
                             :disabled="product.track_inventory && product.stock_quantity <= 0"
                             :class="product.track_inventory && product.stock_quantity <= 0 ? 'opacity-50 cursor-not-allowed' : ''"
                             class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-slate-700/50 hover:border-slate-400 dark:hover:border-slate-500 hover:shadow-lg transition-all p-3 flex flex-col items-center text-center gap-2 min-h-[150px] active:scale-95 select-none relative">
-                        <!-- Badge stock critique -->
                         <span x-show="product.track_inventory && product.stock_quantity <= product.stock_alert_threshold && product.stock_quantity > 0" class="absolute top-2 right-2 w-3 h-3 bg-orange-500 rounded-full" title="Stock critique"></span>
                         <span x-show="product.track_inventory && product.stock_quantity <= 0" class="absolute top-2 right-2 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded">RUPTURE</span>
-                        <!-- Badge route -->
                         <span x-show="product.kitchen_route === 'bar'" class="absolute top-2 left-2 px-1.5 py-0.5 bg-purple-500 text-white text-[9px] font-bold rounded">BAR</span>
                         <span x-show="product.kitchen_route === 'counter'" class="absolute top-2 left-2 px-1.5 py-0.5 bg-cyan-500 text-white text-[9px] font-bold rounded">COMPTOIR</span>
                         <div class="w-full h-24 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -184,7 +223,6 @@
                     </div>
                     <div class="text-right flex-shrink-0">
                         <p class="text-sm font-bold text-gray-800 dark:text-white" x-text="formatMoney(item.price * item.quantity)"></p>
-                        <p class="text-xs text-gray-400" x-text="formatUSD(item.price * item.quantity)"></p>
                     </div>
                     <button @click="removeFromCart(index)" class="flex-shrink-0 w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition active:scale-90">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -196,22 +234,19 @@
                 <p class="text-sm">Panier vide</p>
             </div>
         </div>
-        <!-- Totals + Send to Kitchen button -->
+        <!-- Totals + Actions -->
         <div class="border-t border-gray-200/50 dark:border-slate-700/50 bg-white/90 dark:bg-slate-800/90 px-4 py-3 flex-shrink-0 space-y-2">
             <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                 <span>Sous-total</span>
-                <div class="text-right"><span x-text="formatMoney(subtotal)"></span><span class="block text-xs text-gray-400" x-text="formatUSD(subtotal)"></span></div>
+                <span x-text="formatMoney(subtotal)"></span>
             </div>
             <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400" x-show="tax > 0">
                 <span>Taxes</span>
-                <div class="text-right"><span x-text="formatMoney(tax)"></span><span class="block text-xs text-gray-400" x-text="formatUSD(tax)"></span></div>
+                <span x-text="formatMoney(tax)"></span>
             </div>
             <div class="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-slate-700">
                 <span class="text-base font-bold text-gray-800 dark:text-white">Total</span>
-                <div class="text-right">
-                    <span class="text-xl font-bold text-slate-900 dark:text-white" x-text="formatMoney(grandTotal)"></span>
-                    <span class="block text-sm text-gray-500 dark:text-gray-400 font-medium" x-text="formatUSD(grandTotal)"></span>
-                </div>
+                <span class="text-xl font-bold text-slate-900 dark:text-white" x-text="formatMoney(grandTotal)"></span>
             </div>
             <button @click="submitOrder()" :disabled="cart.length === 0 || isSubmitting"
                     :class="cart.length === 0 ? 'bg-gray-300 dark:bg-slate-700 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-[0.98]'"
@@ -223,14 +258,14 @@
         </div>
     </div>
 
-    <!-- MODALE AJOUT PRODUIT (qty + notes) -->
+    <!-- MODALE AJOUT PRODUIT -->
     <div x-show="showAddModal" x-transition class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" @click.self="showAddModal = false" style="display: none;">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div class="bg-slate-900 dark:bg-slate-950 text-white px-5 py-4">
                 <h3 class="text-lg font-bold" x-text="addModalProduct?.name ?? ''"></h3>
-                <p class="text-sm text-gray-400 mt-0.5"><span x-text="formatMoney(addModalProduct?.price ?? 0)"></span><span class="text-gray-500 ml-2" x-text="formatUSD(addModalProduct?.price ?? 0)"></span></p>
+                <p class="text-sm text-gray-400 mt-0.5"><span x-text="formatMoney(addModalProduct?.price ?? 0)"></span></p>
                 <p class="text-xs text-gray-500 mt-1">
-                    <span x-show="addModalProduct?.kitchen_route === 'bar'" class="text-purple-400">🍺 Envoyé au Bar (pas de préparation cuisine)</span>
+                    <span x-show="addModalProduct?.kitchen_route === 'bar'" class="text-purple-400">🍺 Envoyé au Bar</span>
                     <span x-show="addModalProduct?.kitchen_route === 'counter'" class="text-cyan-400">🥤 Servi au comptoir</span>
                     <span x-show="!addModalProduct?.kitchen_route || addModalProduct?.kitchen_route === 'kitchen'" class="text-yellow-400">👨‍🍳 Envoyé en cuisine (KDS)</span>
                 </p>
@@ -255,6 +290,68 @@
             </div>
         </div>
     </div>
+
+    <!-- MODALE PAIEMENT -->
+    <div x-show="showPaymentModal" x-transition class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" @click.self="showPaymentModal = false" style="display: none;">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-slate-900 dark:bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold">Paiement</h3>
+                    <p class="text-sm text-gray-400" x-text="activeTableName"></p>
+                </div>
+                <div class="text-right">
+                    <span class="text-2xl font-bold" x-text="formatMoney(activeOrderTotal)"></span>
+                </div>
+            </div>
+            <div class="p-5 space-y-5">
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-3">Mode de paiement</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label :class="paymentMethod === 'cash' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-500' : 'border-gray-200 dark:border-slate-600'" class="flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 cursor-pointer transition-all">
+                            <input type="radio" x-model="paymentMethod" value="cash" class="sr-only" />
+                            <span class="text-2xl">💵</span>
+                            <span class="text-xs font-medium" :class="paymentMethod === 'cash' ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'">Cash</span>
+                        </label>
+                        <label :class="paymentMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500' : 'border-gray-200 dark:border-slate-600'" class="flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 cursor-pointer transition-all">
+                            <input type="radio" x-model="paymentMethod" value="mobile_money" class="sr-only" />
+                            <span class="text-2xl">📱</span>
+                            <span class="text-xs font-medium" :class="paymentMethod === 'mobile_money' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'">Mobile Money</span>
+                        </label>
+                        <label :class="paymentMethod === 'credit' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-500' : 'border-gray-200 dark:border-slate-600'" class="flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 cursor-pointer transition-all">
+                            <input type="radio" x-model="paymentMethod" value="credit" class="sr-only" />
+                            <span class="text-2xl">💳</span>
+                            <span class="text-xs font-medium" :class="paymentMethod === 'credit' ? 'text-orange-700 dark:text-orange-300' : 'text-gray-600 dark:text-gray-400'">Crédit</span>
+                        </label>
+                    </div>
+                </div>
+                <template x-if="paymentMethod === 'cash'">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Montant reçu (FC)</label>
+                            <input type="number" x-model.number="cashReceived" min="0" step="100" @input="calculateChange()" class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-lg text-right font-semibold min-h-[48px] focus:ring-2 focus:ring-green-500" placeholder="0">
+                        </div>
+                        <div class="rounded-xl p-4 text-center" :class="changeGiven >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'">
+                            <p class="text-xs uppercase tracking-wide mb-1" :class="changeGiven >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">Monnaie à rendre</p>
+                            <p class="text-2xl font-bold" :class="changeGiven >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"><span x-text="formatMoney(Math.abs(changeGiven))"></span></p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="paymentMethod === 'mobile_money'">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Référence de transaction</label>
+                        <input type="text" x-model="paymentReference" class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-sm min-h-[48px] focus:ring-2 focus:ring-blue-500" placeholder="Ex: MOMO-XXXX-XXXX">
+                    </div>
+                </template>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-200 dark:border-slate-700 flex gap-3">
+                <button @click="showPaymentModal = false" class="flex-1 py-3 rounded-xl border-2 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">Annuler</button>
+                <button @click="processPayment()" :disabled="isProcessing" :class="isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'" class="flex-1 py-3 rounded-xl text-white font-semibold text-sm shadow-md transition-all">
+                    <span x-show="!isProcessing">✅ Valider le paiement</span>
+                    <span x-show="isProcessing" class="flex items-center justify-center gap-2"><svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -272,8 +369,21 @@ function posWorkflow() {
         addModalQty: 1,
         addModalNotes: '',
         isSubmitting: false,
-        currentOrderId: null,
-        currentOrderNumber: '',
+        // Commande active (si table avec commande)
+        activeOrderId: null,
+        activeOrderNumber: '',
+        activeOrderTotal: 0,
+        activeOrderStatus: '',
+        activeOrderStatusLabel: '',
+        activeTableName: '',
+        // Paiement
+        showPaymentModal: false,
+        paymentMethod: 'cash',
+        cashReceived: 0,
+        changeGiven: 0,
+        paymentReference: '',
+        isProcessing: false,
+        // Taxes et devises
         taxRate: {{ $restaurant->tax_rate ?? 0 }},
         exchangeRate: {{ \App\Models\SiteSetting::getValue('exchange_rate', 2850) }},
         defaultCurrency: '{{ \App\Models\SiteSetting::getValue('default_currency', 'FC') }}',
@@ -290,12 +400,37 @@ function posWorkflow() {
 
         init() {},
 
-        selectTable(tableId, tableName) {
+        selectTable(tableId, tableName, orderId, orderNumber, orderTotal, status) {
             this.selectedTable = tableId;
             this.selectedTableName = tableName;
             this.tableSelected = true;
             this.cart = [];
-            this.currentOrderId = null;
+            // Si la table a une commande active
+            if (orderId) {
+                this.activeOrderId = orderId;
+                this.activeOrderNumber = orderNumber;
+                this.activeOrderTotal = orderTotal;
+                this.activeOrderStatus = status;
+                this.activeOrderStatusLabel = this.getStatusLabel(status);
+                this.activeTableName = tableName;
+            } else {
+                this.activeOrderId = null;
+                this.activeOrderNumber = '';
+                this.activeOrderTotal = 0;
+                this.activeOrderStatus = '';
+                this.activeOrderStatusLabel = '';
+            }
+        },
+
+        getStatusLabel(status) {
+            return {
+                'pending': 'Brouillon',
+                'sent_to_kitchen': 'En cuisine',
+                'ready': 'Prêt à servir',
+                'delivered': 'Servi',
+                'paid': 'Payée',
+                'annulee': 'Annulée'
+            }[status] || status;
         },
 
         changeTable() {
@@ -304,7 +439,7 @@ function posWorkflow() {
             this.tableSelected = false;
             this.selectedTable = null;
             this.selectedTableName = '';
-            this.currentOrderId = null;
+            this.activeOrderId = null;
         },
 
         returnToFloorPlan() {
@@ -313,7 +448,7 @@ function posWorkflow() {
             this.tableSelected = false;
             this.selectedTable = null;
             this.selectedTableName = '';
-            this.currentOrderId = null;
+            this.activeOrderId = null;
         },
 
         formatMoney(amount) {
@@ -328,9 +463,8 @@ function posWorkflow() {
         },
 
         openAddToCartModal(product) {
-            // Bloquer si rupture de stock
             if (product.track_inventory && product.stock_quantity <= 0) {
-                alert('❌ Produit en rupture de stock — impossible d\'ajouter au panier.');
+                alert('❌ Produit en rupture de stock');
                 return;
             }
             this.addModalProduct = product;
@@ -341,8 +475,6 @@ function posWorkflow() {
 
         confirmAddToCart() {
             if (!this.addModalProduct || this.addModalQty < 1) return;
-
-            // Vérifier le stock disponible
             const product = this.products.find(p => p.id === this.addModalProduct.id);
             if (product && product.track_inventory) {
                 const inCart = this.cart.filter(i => i.id === this.addModalProduct.id).reduce((s, i) => s + i.quantity, 0);
@@ -351,7 +483,6 @@ function posWorkflow() {
                     return;
                 }
             }
-
             const existing = this.cart.find(item => item.id === this.addModalProduct.id);
             if (existing) {
                 existing.quantity += this.addModalQty;
@@ -373,54 +504,87 @@ function posWorkflow() {
         removeFromCart(index) { this.cart.splice(index, 1); },
         clearCart() { if (confirm('Vider le panier ?')) this.cart = []; },
 
-        /**
-         * ── Imprimer l'addition (PROFORMA) ──
-         * Ouvre le reçu proforma dans une nouvelle fenêtre
-         */
+        // ── Imprimer l'addition (PROFORMA) ──
         printProforma(orderId) {
-            if (!orderId) {
-                alert('Aucune commande active. Envoyez d\'abord la commande en cuisine.');
-                return;
-            }
+            if (!orderId) { alert('Aucune commande active.'); return; }
             window.open(`/pos/order/${orderId}/receipt/proforma`, '_blank', 'width=400,height=700');
         },
 
-        /**
-         * ── Envoyer le reçu via WhatsApp (Deep Link) ──
-         * Ouvre WhatsApp avec un message pré-formaté contenant le lien du reçu
-         */
+        // ── Envoyer via WhatsApp ──
         sendViaWhatsApp(orderId, orderNumber, restaurantName) {
-            if (!orderId) {
-                alert('Aucune commande active.');
-                return;
-            }
-
-            // Construire l'URL du reçu PDF
+            if (!orderId) { alert('Aucune commande active.'); return; }
             const receiptUrl = `${window.location.origin}/pos/order/${orderId}/receipt`;
-
-            // Message pré-formaté
             const message = encodeURIComponent(
                 `Merci pour votre visite chez ${restaurantName} !\n\n` +
                 `📋 Ticket: ${orderNumber}\n` +
                 `🧾 Votre reçu: ${receiptUrl}\n\n` +
                 `À bientôt ! — M-SEC Technology Consulting`
             );
-
-            // Deep link WhatsApp (fonctionne sur mobile et desktop)
-            const whatsappUrl = `https://wa.me/?text=${message}`;
-
-            window.open(whatsappUrl, '_blank');
+            window.open(`https://wa.me/?text=${message}`, '_blank');
         },
 
-        /**
-         * ── Soumettre la commande (création + routage) ──
-         * FIX BUG: Gestion propre des erreurs, validation côte serveur,
-         * réponse JSON structurée, pas de 500 silencieux.
-         */
+        // ── Ouvrir modale paiement ──
+        openPaymentModal() {
+            if (!this.activeOrderId) { alert('Aucune commande à payer.'); return; }
+            this.cashReceived = this.activeOrderTotal;
+            this.changeGiven = 0;
+            this.paymentReference = '';
+            this.paymentMethod = 'cash';
+            this.showPaymentModal = true;
+        },
+
+        calculateChange() {
+            const received = parseFloat(this.cashReceived) || 0;
+            this.changeGiven = received - this.activeOrderTotal;
+        },
+
+        // ── Traiter le paiement ──
+        async processPayment() {
+            if (this.isProcessing) return;
+            if (this.paymentMethod === 'cash') {
+                const r = parseFloat(this.cashReceived) || 0;
+                if (r < this.activeOrderTotal) { alert('Montant insuffisant.'); return; }
+            }
+            if (this.paymentMethod === 'mobile_money' && !this.paymentReference.trim()) {
+                alert('Référence requise.'); return;
+            }
+            this.isProcessing = true;
+            try {
+                const response = await fetch(`/pos/order/${this.activeOrderId}/pay`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({
+                        payment_method: this.paymentMethod,
+                        payment_reference: this.paymentReference,
+                        cash_received: parseFloat(this.cashReceived) || 0,
+                    }),
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Paiement réussi! Monnaie: ' + this.formatMoney(data.change_given));
+                    this.showPaymentModal = false;
+                    this.activeOrderId = null;
+                    this.activeOrderStatus = 'paid';
+                    this.activeOrderStatusLabel = 'Payée';
+                    // Recharger la page pour mettre à jour
+                    location.reload();
+                } else {
+                    alert('❌ ' + (data.message || 'Erreur de paiement.'));
+                }
+            } catch (e) {
+                alert('❌ Erreur de connexion.');
+            }
+            this.isProcessing = false;
+        },
+
+        // ── Soumettre la commande ──
         async submitOrder() {
             if (this.cart.length === 0 || this.isSubmitting) return;
             this.isSubmitting = true;
-
             try {
                 const payload = {
                     items: this.cart.map(i => ({
@@ -436,7 +600,6 @@ function posWorkflow() {
                     table_id: this.selectedTable,
                     notes: null,
                 };
-
                 const response = await fetch('{{ route("pos.order.store") }}', {
                     method: 'POST',
                     headers: {
@@ -446,22 +609,16 @@ function posWorkflow() {
                     },
                     body: JSON.stringify(payload),
                 });
-
                 const data = await response.json();
-
                 if (response.ok && data.success) {
-                    // Vider le panier et retourner au plan de salle
                     this.cart = [];
-                    this.currentOrderId = data.order_id;
-                    this.currentOrderNumber = data.order_number || '';
+                    this.activeOrderId = data.order_id;
+                    this.activeOrderNumber = data.order_number || '';
+                    this.activeOrderTotal = data.total;
+                    this.activeOrderStatus = data.status;
+                    this.activeOrderStatusLabel = this.getStatusLabel(data.status);
                     alert('✅ ' + data.message);
-
-                    // Retour automatique au plan de salle après succès
-                    this.tableSelected = false;
-                    this.selectedTable = null;
-                    this.selectedTableName = '';
                 } else {
-                    // Afficher l'erreur retournée par le serveur
                     alert('❌ ' + (data.message || 'Erreur lors de la soumission.'));
                 }
             } catch (error) {
