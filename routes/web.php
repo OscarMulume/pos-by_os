@@ -179,6 +179,7 @@ Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
 // Reçus
 Route::middleware('auth')->prefix('pos')->name('pos.')->group(function () {
     Route::get('/order/{order}/receipt', [App\Http\Controllers\Pos\ReceiptController::class, 'show'])->name('order.receipt');
+    Route::get('/order/{order}/receipt/proforma', [App\Http\Controllers\Pos\ReceiptController::class, 'proforma'])->name('order.receipt.proforma');
     Route::get('/order/{order}/receipt/thermal', [App\Http\Controllers\Pos\ReceiptController::class, 'thermal'])->name('order.receipt.thermal');
 });
 

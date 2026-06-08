@@ -76,7 +76,7 @@
 
     <!-- LEFT: PRODUITS -->
     <div class="flex-1 flex flex-col min-w-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border-r border-gray-200/50 dark:border-slate-700/50">
-        <!-- Barre info table + bouton retour plan de salle -->
+        <!-- Barre info table + boutons actions -->
         <div class="bg-slate-800 dark:bg-slate-950 text-white px-4 py-2 flex items-center justify-between flex-shrink-0">
             <div class="flex items-center gap-3">
                 <button @click="returnToFloorPlan()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition flex items-center gap-1">
@@ -86,7 +86,21 @@
                 <span class="text-sm font-bold" x-text="selectedTableName"></span>
                 <span class="text-xs text-gray-400" x-text="'(' + cartItemCount + ' articles)'"></span>
             </div>
-            <button @click="changeTable()" class="text-xs text-gray-400 hover:text-white underline transition">Changer de table</button>
+            <div class="flex items-center gap-2">
+                <!-- Bouton Proforma (si commande active) -->
+                <button x-show="currentOrderId" @click="printProforma(currentOrderId)"
+                        class="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-lg transition flex items-center gap-1"
+                        title="Imprimer l'addition (proforma)">
+                    🖨️ Addition
+                </button>
+                <!-- Bouton WhatsApp (si commande active) -->
+                <button x-show="currentOrderId" @click="sendViaWhatsApp(currentOrderId, currentOrderNumber, '{{ $restaurant->name ?? '' }}')"
+                        class="text-xs bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg transition flex items-center gap-1"
+                        title="Envoyer le reçu via WhatsApp">
+                    📱 WhatsApp
+                </button>
+                <button @click="changeTable()" class="text-xs text-gray-400 hover:text-white underline transition">Changer de table</button>
+            </div>
         </div>
         <!-- Category Tabs -->
         <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-slate-700/50 px-3 py-2 flex-shrink-0">
@@ -241,6 +255,7 @@ function posWorkflow() {
         addModalNotes: '',
         isSubmitting: false,
         currentOrderId: null,
+        currentOrderNumber: '',
         taxRate: {{ $restaurant->tax_rate ?? 0 }},
         exchangeRate: {{ \App\Models\SiteSetting::getValue('exchange_rate', 2850) }},
         defaultCurrency: '{{ \App\Models\SiteSetting::getValue('default_currency', 'FC') }}',
@@ -341,6 +356,45 @@ function posWorkflow() {
         clearCart() { if (confirm('Vider le panier ?')) this.cart = []; },
 
         /**
+         * ── Imprimer l'addition (PROFORMA) ──
+         * Ouvre le reçu proforma dans une nouvelle fenêtre
+         */
+        printProforma(orderId) {
+            if (!orderId) {
+                alert('Aucune commande active. Envoyez d\'abord la commande en cuisine.');
+                return;
+            }
+            window.open(`/pos/order/${orderId}/receipt/proforma`, '_blank', 'width=400,height=700');
+        },
+
+        /**
+         * ── Envoyer le reçu via WhatsApp (Deep Link) ──
+         * Ouvre WhatsApp avec un message pré-formaté contenant le lien du reçu
+         */
+        sendViaWhatsApp(orderId, orderNumber, restaurantName) {
+            if (!orderId) {
+                alert('Aucune commande active.');
+                return;
+            }
+
+            // Construire l'URL du reçu PDF
+            const receiptUrl = `${window.location.origin}/pos/order/${orderId}/receipt`;
+
+            // Message pré-formaté
+            const message = encodeURIComponent(
+                `Merci pour votre visite chez ${restaurantName} !\n\n` +
+                `📋 Ticket: ${orderNumber}\n` +
+                `🧾 Votre reçu: ${receiptUrl}\n\n` +
+                `À bientôt ! — M-SEC Technology Consulting`
+            );
+
+            // Deep link WhatsApp (fonctionne sur mobile et desktop)
+            const whatsappUrl = `https://wa.me/?text=${message}`;
+
+            window.open(whatsappUrl, '_blank');
+        },
+
+        /**
          * ── Soumettre la commande (création + routage) ──
          * FIX BUG: Gestion propre des erreurs, validation côte serveur,
          * réponse JSON structurée, pas de 500 silencieux.
@@ -381,6 +435,7 @@ function posWorkflow() {
                     // Vider le panier et retourner au plan de salle
                     this.cart = [];
                     this.currentOrderId = data.order_id;
+                    this.currentOrderNumber = data.order_number || '';
                     alert('✅ ' + data.message);
 
                     // Retour automatique au plan de salle après succès
