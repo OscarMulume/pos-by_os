@@ -37,12 +37,19 @@
                     $isClickable = $tbl->isAvailable() || in_array($tbl->status, ['kitchen_processing', 'served_unpaid', 'occupied']);
                 @endphp
                 <button @click="selectTable({{ $tbl->id }}, '{{ $tbl->name }}')"
-                        class="p-4 rounded-xl border-2 transition-all active:scale-95 min-h-[80px]
+                        class="p-4 rounded-xl border-2 transition-all active:scale-95 min-h-[80px] relative
                                {{ $tc === 'green' ? 'border-green-500/50 bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:border-green-400' : '' }}
                                {{ $tc === 'yellow' ? 'border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 hover:border-yellow-400' : '' }}
                                {{ $tc === 'blue' ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:border-blue-400' : '' }}
-                               {{ $tc === 'red' ? 'border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:border-red-400' : '' }}"
+                               {{ $tc === 'red' ? 'border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:border-red-400' : '' }}
+                               {{ $tbl->isSlaBreached(30) ? 'animate-pulse ring-2 ring-red-500 ring-offset-2 ring-offset-slate-900' : '' }}"
                         {{ !$isClickable ? 'disabled' : '' }}>
+                    <!-- Badge SLA dépassé -->
+                    @if($tbl->isSlaBreached(30))
+                        <div class="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center z-10">
+                            <span class="text-white text-xs font-bold">!</span>
+                        </div>
+                    @endif
                     <div class="text-lg font-bold">{{ $tbl->name }}</div>
                     <div class="text-xs mt-1">{{ $tbl->zone ? $tbl->zone : '' }}</div>
                     <div class="text-xs mt-0.5">
@@ -51,6 +58,17 @@
                             {{ $tLabel }}
                         </span>
                     </div>
+                    <!-- Chronomètre SLA -->
+                    @if($tbl->getWaitMinutes() !== null && in_array($tbl->status, ['kitchen_processing', 'served_unpaid']))
+                        <div class="mt-1">
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold
+                                {{ $tbl->getWaitMinutes() < 15 ? 'bg-green-500/20 text-green-400' : '' }}
+                                {{ $tbl->getWaitMinutes() >= 15 && $tbl->getWaitMinutes() < 30 ? 'bg-yellow-500/20 text-yellow-400' : '' }}
+                                {{ $tbl->getWaitMinutes() >= 30 ? 'bg-red-500/20 text-red-400 animate-pulse' : '' }}">
+                                ⏳ {{ $tbl->getWaitMinutes() }} min
+                            </span>
+                        </div>
+                    @endif
                     @if($tbl->currentOrder)
                         <div class="text-[10px] mt-1 text-gray-500">#{{ $tbl->currentOrder->order_number }}</div>
                     @endif
