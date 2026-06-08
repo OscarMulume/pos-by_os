@@ -32,10 +32,10 @@ class SuperAdminController extends \App\Http\Controllers\Controller
             'active_restaurants'   => Restaurant::where('status', Restaurant::STATUS_ACTIVE)->count(),
             'suspended_restaurants'=> Restaurant::where('status', Restaurant::STATUS_SUSPENDED)->count(),
             'total_users'          => User::count(),
-            'total_orders'         => Order::where('status', Order::STATUS_PAYEE)->count(),
-            'total_revenue'        => Order::where('status', Order::STATUS_PAYEE)->sum('total_amount'),
-            'today_orders'         => Order::where('status', Order::STATUS_PAYEE)->whereDate('created_at', today())->count(),
-            'today_revenue'        => Order::where('status', Order::STATUS_PAYEE)->whereDate('created_at', today())->sum('total_amount'),
+            'total_orders'         => Order::where('status', Order::STATUS_PAID)->count(),
+            'total_revenue'        => Order::where('status', Order::STATUS_PAID)->sum('total_amount'),
+            'today_orders'         => Order::where('status', Order::STATUS_PAID)->whereDate('created_at', today())->count(),
+            'today_revenue'        => Order::where('status', Order::STATUS_PAID)->whereDate('created_at', today())->sum('total_amount'),
             'open_shifts'          => CashShift::where('status', 'open')->count(),
         ];
 
@@ -45,7 +45,7 @@ class SuperAdminController extends \App\Http\Controllers\Controller
             $date = now()->subDays($i);
             $revenueChart[] = [
                 'date'    => $date->format('d/m'),
-                'revenue' => Order::where('status', Order::STATUS_PAYEE)
+                'revenue' => Order::where('status', Order::STATUS_PAID)
                     ->whereDate('created_at', $date)
                     ->sum('total_amount'),
             ];
@@ -290,7 +290,7 @@ class SuperAdminController extends \App\Http\Controllers\Controller
         ]);
 
         $stats = [
-            'total_orders'   => $restaurant->orders()->where('status', Order::STATUS_PAYEE)->count(),
+            'total_orders'   => $restaurant->orders()->where('status', Order::STATUS_PAID)->count(),
             'total_revenue'  => $restaurant->totalRevenue(),
             'today_orders'   => $restaurant->todayOrderCount(),
             'today_revenue'  => $restaurant->todayRevenue(),

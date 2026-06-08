@@ -73,7 +73,7 @@ class DashboardController extends Controller
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->where('orders.restaurant_id', $restaurantId)
             ->whereDate('orders.created_at', $today)
-            ->whereIn('orders.status', ['payee', 'paid'])
+            ->where('orders.status', 'paid')
             ->selectRaw('
                 order_items.product_id,
                 order_items.product_name,
@@ -90,7 +90,7 @@ class DashboardController extends Controller
         // ═══════════════════════════════════════════
         $paymentMethods = Order::where('restaurant_id', $restaurantId)
             ->whereDate('created_at', $today)
-            ->whereIn('status', ['payee', 'paid'])
+            ->where('status', 'paid')
             ->selectRaw("
                 payment_method,
                 COUNT(*) as count,
@@ -110,7 +110,7 @@ class DashboardController extends Controller
             $date = now()->subDays($i);
             $dayData = Order::where('restaurant_id', $restaurantId)
                 ->whereDate('created_at', $date)
-                ->whereIn('status', ['payee', 'paid'])
+                ->where('status', 'paid')
                 ->selectRaw('COUNT(*) as orders, COALESCE(SUM(total_amount), 0) as revenue')
                 ->first();
 

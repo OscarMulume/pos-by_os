@@ -47,7 +47,7 @@ class ReportController extends Controller
 
         // Ventes nettes (payées uniquement)
         $paidSummary = (clone $baseQuery)
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->selectRaw('
                 COUNT(*) as paid_orders,
                 SUM(total_amount) as net_revenue
@@ -64,7 +64,7 @@ class ReportController extends Controller
         // Répartition par catégorie
         $salesByCategory = OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $restaurantId) {
                 $q->whereBetween('created_at', [$startDate, $endDate])
-                  ->where('status', Order::STATUS_PAYEE);
+                  ->where('status', Order::STATUS_PAID);
                 if ($restaurantId) {
                     $q->where('restaurant_id', $restaurantId);
                 }
@@ -83,7 +83,7 @@ class ReportController extends Controller
 
         // Répartition par mode de paiement
         $salesByPaymentMethod = (clone $baseQuery)
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->selectRaw('
                 payment_method,
                 COUNT(*) as transaction_count,
@@ -108,7 +108,7 @@ class ReportController extends Controller
         // Top produits
         $topProducts = OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $restaurantId) {
                 $q->whereBetween('created_at', [$startDate, $endDate])
-                  ->where('status', Order::STATUS_PAYEE);
+                  ->where('status', Order::STATUS_PAID);
                 if ($restaurantId) {
                     $q->where('restaurant_id', $restaurantId);
                 }
@@ -129,7 +129,7 @@ class ReportController extends Controller
             $salesByRestaurant = Restaurant::leftJoin('orders', function ($join) use ($startDate, $endDate) {
                     $join->on('restaurants.id', '=', 'orders.restaurant_id')
                          ->whereBetween('orders.created_at', [$startDate, $endDate])
-                         ->where('orders.status', Order::STATUS_PAYEE);
+                         ->where('orders.status', Order::STATUS_PAID);
                 })
                 ->selectRaw('
                     restaurants.id,
@@ -150,7 +150,7 @@ class ReportController extends Controller
 
         // Évolution journalière (pour graphique)
         $dailyTrend = (clone $baseQuery)
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->selectRaw('
                 DATE(created_at) as date,
                 COUNT(*) as order_count,
@@ -206,7 +206,7 @@ class ReportController extends Controller
             ->first();
 
         $paidSummary = (clone $baseQuery)
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->selectRaw('COUNT(*) as paid_orders, SUM(total_amount) as net_revenue')
             ->first();
 
@@ -217,7 +217,7 @@ class ReportController extends Controller
             ->first();
 
         $salesByCategory = OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $restaurantId) {
-                $q->whereBetween('created_at', [$startDate, $endDate])->where('status', Order::STATUS_PAYEE);
+                $q->whereBetween('created_at', [$startDate, $endDate])->where('status', Order::STATUS_PAID);
                 if ($restaurantId) $q->where('restaurant_id', $restaurantId);
             })
             ->join('products', 'order_items.product_id', '=', 'products.id')
@@ -228,7 +228,7 @@ class ReportController extends Controller
             ->get();
 
         $salesByPaymentMethod = (clone $baseQuery)
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->selectRaw('payment_method, COUNT(*) as transaction_count, SUM(total_amount) as total_amount')
             ->groupBy('payment_method')
             ->get()

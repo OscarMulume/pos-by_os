@@ -216,7 +216,7 @@
                                 <td class="py-3 text-sm font-semibold text-gray-900 dark:text-white">{{ number_format($order->total_amount, 0, ',', ' ') }}</td>
                                 <td class="py-3">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                                        {{ $order->status === 'payee' ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : '' }}
+                                        {{ $order->status === 'paid' ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : '' }}
                                         {{ $order->status === 'en_cours' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : '' }}
                                         {{ $order->status === 'en_attente' ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : '' }}
                                         {{ $order->status === 'annulee' ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' : '' }}">

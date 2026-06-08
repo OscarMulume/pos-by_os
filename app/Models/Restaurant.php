@@ -140,7 +140,7 @@ class Restaurant extends Model
     {
         return $this->orders()
             ->whereDate('created_at', today())
-            ->where('status', Order::STATUS_PAYEE);
+            ->where('status', Order::STATUS_PAID);
     }
 
     public function todayOrdersEnCours()
@@ -163,14 +163,14 @@ class Restaurant extends Model
     public function totalRevenue(): float
     {
         return (float) $this->orders()
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->sum('total_amount');
     }
 
     public function totalOrderCount(): int
     {
         return $this->orders()
-            ->where('status', Order::STATUS_PAYEE)
+            ->where('status', Order::STATUS_PAID)
             ->count();
     }
 

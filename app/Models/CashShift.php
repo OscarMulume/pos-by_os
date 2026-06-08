@@ -80,7 +80,7 @@ class CashShift extends Model
     public function calculateExpected(): float
     {
         $salesTotal = $this->orders()
-            ->where('status', \App\Models\Order::STATUS_PAYEE)
+            ->where('status', \App\Models\Order::STATUS_PAID)
             ->sum('total_amount');
         return $this->start_amount + $salesTotal;
     }

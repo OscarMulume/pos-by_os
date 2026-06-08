@@ -32,7 +32,7 @@ class OrderService
 
             // Calcul du total
             $total = collect($data['items'])->sum(
-                fn($item) => $item['quantity'] * $item['price']
+                fn($item) => $item['quantity'] * ($item['unit_price'] ?? $item['price'] ?? 0)
             );
             $discountAmount = $data['discount_amount'] ?? 0;
             $taxAmount = $data['tax_amount'] ?? 0;
@@ -289,11 +289,23 @@ class OrderService
                 'customer_phone'    => $paymentData['customer_phone'] ?? null,
             ]);
 
-            // Déduire les stocks des produits
+            // Déduire les stocks des produits ET des ingrédients (BOM)
             foreach ($order->items as $item) {
                 $product = Product::find($item->product_id);
-                if ($product && $product->track_inventory) {
+                if (!$product) continue;
+
+                // Déduire le stock du produit fini
+                if ($product->track_inventory) {
                     $product->deductStock($item->quantity, $order->id, auth()->id());
+                }
+
+                // Déduire les ingrédients (Fiche Technique / BOM)
+                $product->loadMissing('ingredients');
+                foreach ($product->ingredients as $ingredient) {
+                    $qtyRequired = ($ingredient->pivot->quantity_required ?? 0) * $item->quantity;
+                    if ($qtyRequired > 0) {
+                        $ingredient->deduct($qtyRequired, $order->id, null, auth()->id());
+                    }
                 }
             }
 

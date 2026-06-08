@@ -22,8 +22,8 @@
 
     @forelse($shifts as $shift)
         @php
-            $salesCount = $shift->orders()->whereIn('status', ['payee', 'paid'])->count();
-            $salesTotal = $shift->orders()->whereIn('status', ['payee', 'paid'])->sum('total_amount');
+            $salesCount = $shift->orders()->whereIn('status', ['paid'])->count();
+            $salesTotal = $shift->orders()->whereIn('status', ['paid'])->sum('total_amount');
             $duration = $shift->opened_at->diffForHumans($shift->closed_at ?? now(), true);
         @endphp
         <div class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 p-5 mb-4">

@@ -182,6 +182,7 @@ class Order extends Model
     public function canBePaid(): bool
     {
         return in_array($this->status, [
+            self::STATUS_SENT_TO_KITCHEN,
             self::STATUS_READY,
             self::STATUS_DELIVERED,
         ]);
