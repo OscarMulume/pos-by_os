@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\RestaurantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ class Product extends Model
     protected $fillable = [
         'restaurant_id', 'category_id', 'name', 'description',
         'price', 'cost_price', 'image_path', 'sort_order', 'prep_time_minutes', 'kitchen_route', 'is_available',
-        'stock_quantity', 'low_stock_threshold', 'track_inventory',
+        'stock_quantity', 'low_stock_threshold', 'stock_alert_threshold', 'stock_status', 'track_inventory',
     ];
 
     protected $casts = [
@@ -23,6 +24,14 @@ class Product extends Model
         'is_available' => 'boolean',
         'track_inventory' => 'boolean',
     ];
+
+    /**
+     * Global Scope multi-tenant
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new RestaurantScope());
+    }
 
     public function restaurant(): BelongsTo
     {
@@ -116,7 +125,36 @@ class Product extends Model
     }
 
     /**
-     * Déduire du stock lors d'une vente
+     * Vérifie si le stock est sous le seuil critique d'alerte
+     */
+    public function isStockCritique(): bool
+    {
+        if (!$this->track_inventory) return false;
+        return $this->stock_quantity <= $this->stock_alert_threshold;
+    }
+
+    /**
+     * Met à jour le statut du stock automatiquement
+     */
+    public function updateStockStatus(): void
+    {
+        if (!$this->track_inventory) {
+            $this->update(['stock_status' => 'normal']);
+            return;
+        }
+
+        $status = match (true) {
+            $this->stock_quantity <= 0 => 'rupture',
+            $this->stock_quantity <= $this->stock_alert_threshold => 'critique',
+            $this->stock_quantity <= $this->low_stock_threshold => 'low',
+            default => 'normal',
+        };
+
+        $this->update(['stock_status' => $status]);
+    }
+
+    /**
+     * Déduire du stock lors d'une vente — avec mise à jour du statut d'alerte
      */
     public function deductStock(int $quantity, ?int $orderId = null, ?int $userId = null): bool
     {
@@ -129,7 +167,9 @@ class Product extends Model
 
         // Désactiver automatiquement si rupture
         if ($stockAfter <= 0) {
-            $this->update(['is_available' => false]);
+            $this->update(['is_available' => false, 'stock_status' => 'rupture']);
+        } else {
+            $this->updateStockStatus();
         }
 
         // Enregistrer le mouvement

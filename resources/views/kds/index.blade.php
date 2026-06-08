@@ -179,6 +179,10 @@
             get enPrepCount() { return this.enPrepOrders.length; },
 
             init() {
+                // Demander permission notifications
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
                 // Horloge
                 setInterval(() => {
                     this.clock = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -277,8 +281,20 @@
                     });
                     const data = await resp.json();
                     if (data.success) {
+                        // Notification visuelle + sonore
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification('KDS — Plat Prêt! 🔔', {
+                                body: `${order.order_number} - ${order.table_name} est prêt!`,
+                                icon: '/favicon.ico',
+                            });
+                        }
                         // Retirer de la liste KDS
                         this.orders = this.orders.filter(o => o.id !== order.id);
+                        // Flash visuel
+                        const flash = document.createElement('div');
+                        flash.className = 'fixed inset-0 z-50 bg-green-500/20 pointer-events-none transition-opacity duration-500';
+                        document.body.appendChild(flash);
+                        setTimeout(() => { flash.classList.add('opacity-0'); setTimeout(() => flash.remove(), 500); }, 100);
                     }
                 } catch(e) { console.error(e); }
             }

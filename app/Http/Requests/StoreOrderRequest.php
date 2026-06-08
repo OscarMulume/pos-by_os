@@ -14,47 +14,48 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.price' => 'required|numeric|min:0',
-            'payment_method' => 'required|in:cash,mobile_money,credit',
-            'payment_reference' => 'nullable|string|max:100',
-            'cash_received' => 'nullable|numeric|min:0',
-            'customer_name' => 'nullable|string|max:100',
-            'customer_phone' => 'nullable|string|max:20',
-            'notes' => 'nullable|string|max:500',
-            'discount_amount' => 'nullable|numeric|min:0',
-            'tax_amount' => 'nullable|numeric|min:0',
-            'table_id' => 'nullable|exists:restaurant_tables,id',
+            'items'                => 'required|array|min:1',
+            'items.*.product_id'   => 'required|integer|exists:products,id',
+            'items.*.quantity'     => 'required|integer|min:1|max:999',
+            'items.*.unit_price'   => 'required|numeric|min:0',
+            'items.*.notes'        => 'nullable|string|max:200',
+            'payment_method'       => 'required|in:cash,mobile_money,credit',
+            'payment_reference'    => 'nullable|string|max:100',
+            'cash_received'        => 'nullable|numeric|min:0',
+            'customer_name'        => 'nullable|string|max:100',
+            'customer_phone'       => 'nullable|string|max:20',
+            'notes'                => 'nullable|string|max:500',
+            'discount_amount'      => 'nullable|numeric|min:0',
+            'tax_amount'           => 'nullable|numeric|min:0',
+            'total'                => 'nullable|numeric|min:0',
+            'table_id'             => 'nullable|integer|exists:restaurant_tables,id',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'items.required' => 'Le panier ne peut pas être vide.',
-            'items.min' => 'Le panier doit contenir au moins un article.',
-            'payment_method.required' => 'Le mode de paiement est obligatoire.',
-            'cash_received.required_if' => 'Le montant reçu est obligatoire pour un paiement en espèces.',
+            'items.required'              => 'Le panier ne peut pas être vide.',
+            'items.min'                   => 'Le panier doit contenir au moins un article.',
+            'items.*.product_id.required' => 'Produit manquant.',
+            'items.*.product_id.exists'   => 'Produit introuvable.',
+            'items.*.quantity.required'   => 'Quantité requise.',
+            'items.*.quantity.min'        => 'La quantité minimum est 1.',
+            'items.*.unit_price.required' => 'Prix unitaire requis.',
+            'payment_method.required'     => 'Le mode de paiement est obligatoire.',
+            'payment_method.in'           => 'Mode de paiement invalide.',
+            'table_id.exists'             => 'Table introuvable.',
         ];
     }
 
-    public function withValidator($validator)
+    /**
+     * Préparer les données pour la validation
+     */
+    protected function prepareForValidation(): void
     {
-        $validator->after(function ($validator) {
-            if ($this->payment_method === 'cash' && !$this->cash_received) {
-                $validator->errors()->add('cash_received', 'Le montant reçu est obligatoire pour un paiement en espèces.');
-            }
-            if ($this->payment_method === 'cash' && $this->cash_received) {
-                $total = collect($this->items)->sum(fn($i) => $i['quantity'] * $i['price']);
-                if ($this->cash_received < $total) {
-                    $validator->errors()->add('cash_received', 'Le montant reçu est inférieur au total.');
-                }
-            }
-            if ($this->payment_method === 'mobile_money' && !$this->payment_reference) {
-                $validator->errors()->add('payment_reference', 'La référence de transaction est obligatoire pour Mobile Money.');
-            }
-        });
+        // S'assurer que items est toujours un tableau
+        if (!$this->has('items') || !is_array($this->items)) {
+            $this->merge(['items' => []]);
+        }
     }
 }

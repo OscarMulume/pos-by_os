@@ -9,31 +9,58 @@ use App\Models\AuditLog;
 use App\Models\User;
 use App\Models\RestaurantTable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class OrderService
 {
     /**
-     * Créer une nouvelle commande (statut initial : en_cours)
+     * Créer une nouvelle commande avec routage intelligent Bar vs Cuisine.
+     *
+     * Logique:
+     * 1. La commande est créée en statut 'pending'
+     * 2. Les items sont analysés selon leur kitchen_route:
+     *    - 'kitchen' → envoyés au KDS (kitchen_status: en_attente)
+     *    - 'bar' → marqués comme livrés immédiatement (pas au KDS)
+     *    - 'counter' → marqués comme livrés immédiatement (pas au KDS)
+     * 3. La table passe en statut 'kitchen_processing' si items cuisine, 'occupied' sinon
+     * 4. Transaction DB atomique — tout ou rien
      */
     public function createOrder(array $data, User $cashier): Order
     {
         return DB::transaction(function () use ($data, $cashier) {
-            $orderNumber = $this->generateOrderNumber($cashier->restaurant_id);
+            $restaurantId = $cashier->restaurant_id;
 
+            // Calcul du total
             $total = collect($data['items'])->sum(
                 fn($item) => $item['quantity'] * $item['price']
             );
-
             $discountAmount = $data['discount_amount'] ?? 0;
             $taxAmount = $data['tax_amount'] ?? 0;
             $netTotal = $total + $taxAmount - $discountAmount;
 
+            // Déterminer s'il y a des items cuisine
+            $hasKitchenItems = false;
+            $hasBarItems = false;
+            $hasCounterItems = false;
+
+            foreach ($data['items'] as $item) {
+                $product = Product::findOrFail($item['product_id']);
+                $route = $product->kitchen_route ?? 'kitchen';
+                if ($route === 'kitchen') $hasKitchenItems = true;
+                if ($route === 'bar') $hasBarItems = true;
+                if ($route === 'counter') $hasCounterItems = true;
+            }
+
+            // Statut initial: pending (brouillon) — sera mis à jour après
+            $initialStatus = Order::STATUS_PENDING;
+
+            // Créer la commande
             $order = Order::create([
-                'restaurant_id'      => $cashier->restaurant_id,
+                'restaurant_id'      => $restaurantId,
                 'pos_terminal_id'    => $data['pos_terminal_id'] ?? $cashier->pos_terminal_id,
                 'user_id'            => $cashier->id,
                 'table_id'           => $data['table_id'] ?? null,
-                'order_number'       => $orderNumber,
+                'order_number'       => $this->generateOrderNumber($restaurantId),
                 'total_amount'       => $netTotal,
                 'tax_amount'         => $taxAmount,
                 'discount_amount'    => $discountAmount,
@@ -45,20 +72,24 @@ class OrderService
                 'customer_name'      => $data['customer_name'] ?? null,
                 'customer_phone'     => $data['customer_phone'] ?? null,
                 'notes'              => $data['notes'] ?? null,
-                'status'             => Order::STATUS_EN_COURS,
-                'kitchen_status'     => Order::KITCHEN_EN_ATTENTE,
-                'sent_to_kitchen_at' => now(),
+                'status'             => $initialStatus,
+                'kitchen_status'     => $hasKitchenItems ? Order::KITCHEN_EN_ATTENTE : null,
+                'sent_to_kitchen_at' => $hasKitchenItems ? now() : null,
             ]);
 
+            // Créer les items avec routage
             foreach ($data['items'] as $item) {
                 $product = Product::findOrFail($item['product_id']);
                 $kitchenRoute = $product->kitchen_route ?? 'kitchen';
+
+                // Déterminer le statut initial de l'item
                 $itemKitchenStatus = match ($kitchenRoute) {
                     'kitchen' => 'en_attente',
-                    'bar' => 'bar',
-                    'counter' => 'comptoir',
-                    default => 'en_attente',
+                    'bar'     => 'delivered',  // Livré immédiatement
+                    'counter' => 'delivered',  // Livré immédiatement
+                    default   => 'en_attente',
                 };
+
                 OrderItem::create([
                     'order_id'      => $order->id,
                     'product_id'    => $item['product_id'],
@@ -72,18 +103,37 @@ class OrderService
                 ]);
             }
 
-            // Marquer la table comme occupée
-            if ($order->table_id) {
-                RestaurantTable::where('id', $order->table_id)
-                    ->update(['status' => RestaurantTable::STATUS_OCCUPEE]);
+            // Mettre à jour le statut de la commande selon le routage
+            if ($hasKitchenItems) {
+                $order->update(['status' => Order::STATUS_SENT_TO_KITCHEN]);
+            } else {
+                // Pas d'items cuisine → commande prête immédiatement
+                $order->update([
+                    'status'       => Order::STATUS_DELIVERED,
+                    'delivered_at' => now(),
+                ]);
             }
 
+            // Mettre à jour la table
+            if ($order->table_id) {
+                $tableStatus = $hasKitchenItems
+                    ? RestaurantTable::STATUS_KITCHEN_PROCESSING
+                    : RestaurantTable::STATUS_OCCUPIED;
+
+                RestaurantTable::where('id', $order->table_id)
+                    ->update([
+                        'status'           => $tableStatus,
+                        'current_order_id' => $order->id,
+                    ]);
+            }
+
+            // Audit log
             AuditLog::create([
                 'user_id'     => $cashier->id,
                 'action'      => 'create_order',
                 'entity_type' => 'order',
                 'entity_id'   => $order->id,
-                'new_values'  => json_decode($order->load('items')->toJson()),
+                'new_values'  => ['order_number' => $order->order_number, 'total' => $netTotal, 'items_count' => count($data['items'])],
                 'ip_address'  => request()->ip(),
             ]);
 
@@ -92,37 +142,88 @@ class OrderService
     }
 
     /**
-     * Marquer une commande comme "en attente" (prête mais pas encore payée)
+     * Marquer une commande comme "prête" (KDS → caisse notifiée)
      */
     public function markAsReady(Order $order): Order
     {
-        if (!$order->isEnCours()) {
-            throw new \Exception('Seules les commandes en cours peuvent être marquées comme prêtes.');
+        if (!in_array($order->status, [Order::STATUS_SENT_TO_KITCHEN, Order::STATUS_PENDING])) {
+            throw new \Exception('Seules les commandes en cuisine peuvent être marquées comme prêtes.');
         }
 
-        $order->update(['status' => Order::STATUS_EN_ATTENTE]);
+        DB::transaction(function () use ($order) {
+            $oldStatus = $order->status;
 
-        AuditLog::create([
-            'user_id'     => auth()->id(),
-            'action'      => 'order_ready',
-            'entity_type' => 'order',
-            'entity_id'   => $order->id,
-            'old_values'  => ['status' => Order::STATUS_EN_COURS],
-            'new_values'  => ['status' => Order::STATUS_EN_ATTENTE],
-            'ip_address'  => request()->ip(),
-        ]);
+            $order->update([
+                'status'             => Order::STATUS_READY,
+                'kitchen_status'     => Order::KITCHEN_PRET,
+                'ready_at'           => now(),
+            ]);
+
+            // Mettre à jour la table en "servi non payé"
+            if ($order->table_id) {
+                RestaurantTable::where('id', $order->table_id)
+                    ->update(['status' => RestaurantTable::STATUS_SERVED_UNPAID]);
+            }
+
+            AuditLog::create([
+                'user_id'     => auth()->id(),
+                'action'      => 'order_ready',
+                'entity_type' => 'order',
+                'entity_id'   => $order->id,
+                'old_values'  => ['status' => $oldStatus],
+                'new_values'  => ['status' => Order::STATUS_READY],
+                'ip_address'  => request()->ip(),
+            ]);
+        });
 
         return $order->fresh();
     }
 
     /**
-     * Payer une commande (en_cours ou en_attente → payee)
+     * Marquer une commande comme "servie" (livrée au client)
+     */
+    public function markAsDelivered(Order $order): Order
+    {
+        if ($order->status !== Order::STATUS_READY) {
+            throw new \Exception('Seules les commandes prêtes peuvent être marquées comme servies.');
+        }
+
+        DB::transaction(function () use ($order) {
+            $oldStatus = $order->status;
+
+            $order->update([
+                'status'       => Order::STATUS_DELIVERED,
+                'delivered_at' => now(),
+            ]);
+
+            // Mettre à jour la table
+            if ($order->table_id) {
+                RestaurantTable::where('id', $order->table_id)
+                    ->update(['status' => RestaurantTable::STATUS_SERVED_UNPAID]);
+            }
+
+            AuditLog::create([
+                'user_id'     => auth()->id(),
+                'action'      => 'order_delivered',
+                'entity_type' => 'order',
+                'entity_id'   => $order->id,
+                'old_values'  => ['status' => $oldStatus],
+                'new_values'  => ['status' => Order::STATUS_DELIVERED],
+                'ip_address'  => request()->ip(),
+            ]);
+        });
+
+        return $order->fresh();
+    }
+
+    /**
+     * Payer une commande (delivered → paid)
      * Déduit automatiquement les stocks
      */
     public function payOrder(Order $order, array $paymentData): Order
     {
         if (!$order->canBePaid()) {
-            throw new \Exception('Cette commande ne peut pas être payée.');
+            throw new \Exception('Cette commande ne peut pas être payée. Statut actuel: ' . $order->status);
         }
 
         $netTotal = $order->total_amount;
@@ -133,7 +234,7 @@ class OrderService
             $oldStatus = $order->status;
 
             $order->update([
-                'status'            => Order::STATUS_PAYEE,
+                'status'            => Order::STATUS_PAID,
                 'payment_method'    => $paymentData['payment_method'],
                 'payment_reference' => $paymentData['payment_reference'] ?? null,
                 'cash_received'     => $cashReceived,
@@ -153,7 +254,10 @@ class OrderService
             // Libérer la table
             if ($order->table_id) {
                 RestaurantTable::where('id', $order->table_id)
-                    ->update(['status' => RestaurantTable::STATUS_LIBRE]);
+                    ->update([
+                        'status'           => RestaurantTable::STATUS_AVAILABLE,
+                        'current_order_id' => null,
+                    ]);
             }
 
             AuditLog::create([
@@ -162,7 +266,7 @@ class OrderService
                 'entity_type' => 'order',
                 'entity_id'   => $order->id,
                 'old_values'  => ['status' => $oldStatus],
-                'new_values'  => ['status' => Order::STATUS_PAYEE],
+                'new_values'  => ['status' => Order::STATUS_PAID],
                 'ip_address'  => request()->ip(),
             ]);
         });
@@ -177,7 +281,7 @@ class OrderService
     public function cancelOrder(Order $order, User $user, string $reason, bool $ruptureStock = false): Order
     {
         if (!$order->canBeCancelled()) {
-            throw new \Exception('Cette commande ne peut pas être annulée.');
+            throw new \Exception('Cette commande ne peut pas être annulée. Statut: ' . $order->status);
         }
 
         DB::transaction(function () use ($order, $user, $reason, $ruptureStock) {
@@ -199,10 +303,13 @@ class OrderService
                 }
             }
 
-            // Libérer la table si la commande est annulée
+            // Libérer la table
             if ($order->table_id) {
                 RestaurantTable::where('id', $order->table_id)
-                    ->update(['status' => RestaurantTable::STATUS_LIBRE]);
+                    ->update([
+                        'status'           => RestaurantTable::STATUS_AVAILABLE,
+                        'current_order_id' => null,
+                    ]);
             }
 
             AuditLog::create([
@@ -230,7 +337,12 @@ class OrderService
     {
         return Order::where('restaurant_id', $restaurantId)
             ->whereDate('created_at', today())
-            ->whereIn('status', [Order::STATUS_EN_COURS, Order::STATUS_EN_ATTENTE])
+            ->whereIn('status', [
+                Order::STATUS_PENDING,
+                Order::STATUS_SENT_TO_KITCHEN,
+                Order::STATUS_READY,
+                Order::STATUS_DELIVERED,
+            ])
             ->exists();
     }
 
@@ -242,8 +354,26 @@ class OrderService
         return Order::with(['user', 'items'])
             ->where('restaurant_id', $restaurantId)
             ->whereDate('created_at', today())
-            ->whereIn('status', [Order::STATUS_EN_COURS, Order::STATUS_EN_ATTENTE])
+            ->whereIn('status', [
+                Order::STATUS_PENDING,
+                Order::STATUS_SENT_TO_KITCHEN,
+                Order::STATUS_READY,
+                Order::STATUS_DELIVERED,
+            ])
             ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * Récupérer les tables avec leurs commandes actives (pour plan de salle)
+     */
+    public function getTablesWithStatus(int $restaurantId): \Illuminate\Database\Eloquent\Collection
+    {
+        return RestaurantTable::with(['currentOrder.items'])
+            ->where('restaurant_id', $restaurantId)
+            ->where('is_active', true)
+            ->orderBy('zone')
+            ->orderBy('name')
             ->get();
     }
 

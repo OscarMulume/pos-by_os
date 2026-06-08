@@ -136,6 +136,41 @@
                 @enderror
             </div>
 
+            <!-- Gestion de stock -->
+            <div class="border-t border-gray-200 pt-4 mt-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">📦 Gestion de stock</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label for="track_inventory" class="inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="track_inventory" value="0">
+                            <input type="checkbox" name="track_inventory" id="track_inventory" value="1" {{ old('track_inventory', true) ? 'checked' : '' }}
+                                   class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700">Suivre le stock</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="stock_alert_threshold" class="block text-sm font-medium text-gray-700 mb-1">Seuil d'alerte critique</label>
+                        <input type="number" name="stock_alert_threshold" id="stock_alert_threshold" value="{{ old('stock_alert_threshold', 5) }}" min="1" max="999"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 @error('stock_alert_threshold') border-red-500 @enderror"
+                               placeholder="5">
+                        <p class="mt-1 text-xs text-gray-400">Alerte orange si stock ≤ cette valeur</p>
+                        @error('stock_alert_threshold')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="low_stock_threshold" class="block text-sm font-medium text-gray-700 mb-1">Seuil stock bas</label>
+                        <input type="number" name="low_stock_threshold" id="low_stock_threshold" value="{{ old('low_stock_threshold', 10) }}" min="1" max="999"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 @error('low_stock_threshold') border-red-500 @enderror"
+                               placeholder="10">
+                        <p class="mt-1 text-xs text-gray-400">Alerte jaune si stock ≤ cette valeur</p>
+                        @error('low_stock_threshold')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
             <!-- Image -->
             <div>
                 <label for="image" class="block text-sm font-medium text-gray-700 mb-1">Image du produit</label>

@@ -20,15 +20,61 @@
         </div>
     </div>
 
-    <!-- Alertes stock bas -->
-    @if($data['low_stock']->isNotEmpty())
+    <!-- Alertes Stock Critique (nouveau widget amélioré) -->
+    @php
+        $stockCritique = $data['stock_critique'] ?? collect();
+        $stockBas = $data['low_stock'] ?? collect();
+        $stockRupture = $data['stock_rupture'] ?? collect();
+    @endphp
+
+    @if($stockCritique->isNotEmpty() || $stockRupture->isNotEmpty())
+    <div class="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4 animate-pulse">
+        <div class="flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <span class="text-sm font-bold text-orange-800 dark:text-orange-300">🚨 Alertes Stock Critique</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200 font-medium">{{ $stockCritique->count() + $stockRupture->count() }} produit(s)</span>
+        </div>
+        <div class="space-y-2">
+            @foreach($stockRupture as $p)
+                <div class="flex items-center justify-between bg-red-100 dark:bg-red-900/30 rounded-lg px-3 py-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span class="text-sm font-medium text-red-800 dark:text-red-300">{{ $p->name }}</span>
+                    </div>
+                    <span class="text-xs font-bold text-red-600 dark:text-red-400">RUPTURE (0)</span>
+                </div>
+            @endforeach
+            @foreach($stockCritique as $p)
+                <div class="flex items-center justify-between bg-orange-100 dark:bg-orange-900/30 rounded-lg px-3 py-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                        <span class="text-sm font-medium text-orange-800 dark:text-orange-300">{{ $p->name }}</span>
+                    </div>
+                    <span class="text-xs font-bold text-orange-600 dark:text-orange-400">CRITIQUE ({{ $p->stock_quantity }} restants)</span>
+                </div>
+            @endforeach
+        </div>
+        @if($stockBas->isNotEmpty())
+        <div class="mt-3 pt-3 border-t border-orange-200 dark:border-orange-800">
+            <p class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">⚠️ Stock bas (attention)</p>
+            <div class="flex flex-wrap gap-2">
+                @foreach($stockBas as $p)
+                    <span class="px-2 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded-lg text-xs font-medium">
+                        {{ $p->name }} ({{ $p->stock_quantity }})
+                    </span>
+                @endforeach
+            </div>
+        </div>
+        @endif
+    </div>
+    @elseif($stockBas->isNotEmpty())
     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
         <div class="flex items-center gap-2 mb-2">
             <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-            <span class="text-sm font-semibold text-amber-800 dark:text-amber-300">Alertes Stock Bas</span>
+            <span class="text-sm font-semibold text-amber-800 dark:text-amber-300">⚠️ Alertes Stock Bas</span>
         </div>
         <div class="flex flex-wrap gap-2">
-            @foreach($data['low_stock'] as $p)
+            @foreach($stockBas as $p)
                 <span class="px-2 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded-lg text-xs font-medium">
                     {{ $p->name }} ({{ $p->stock_quantity }} restants)
                 </span>

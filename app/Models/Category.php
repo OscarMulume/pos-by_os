@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\RestaurantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Category extends Model
 {
     use HasFactory;
+
+    /**
+     * Global Scope multi-tenant
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new RestaurantScope());
+    }
 
     protected $fillable = [
         'restaurant_id', 'name', 'icon', 'color', 'display_order', 'is_active',

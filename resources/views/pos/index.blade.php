@@ -17,18 +17,34 @@
         @endif
         <h2 class="text-2xl font-bold text-white mb-1">Sélectionner une table</h2>
         <p class="text-gray-400 mb-2">{{ $restaurant->name ?? 'Restaurant' }}</p>
-        <p class="text-gray-500 text-sm mb-8">Choisissez la table à servir ou "À emporter" pour commencer</p>
+        <p class="text-gray-500 text-sm mb-8">Choisissez la table à servir ou "À emporter"</p>
+
+        <!-- Legende couleurs -->
+        <div class="flex justify-center gap-4 mb-6 text-xs">
+            <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-green-500"></span> Libre</span>
+            <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> En cuisine</span>
+            <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-blue-500"></span> À encaisser</span>
+            <span class="flex items-center gap-1.5 text-gray-400"><span class="w-3 h-3 rounded-full bg-red-500"></span> Occupée</span>
+        </div>
+
         <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-6">
-            @foreach($tables ?? [] as $table)
-                <button @click="selectTable({{ $table->id }}, '{{ $table->name }}')"
+            @foreach($tables ?? [] as $tbl)
+                @php
+                    $tc = $tbl->getStatusColor();
+                    $tLabel = $tbl->getStatusLabel();
+                    $isClickable = $tbl->isAvailable();
+                @endphp
+                <button @click="selectTable({{ $tbl->id }}, '{{ $tbl->name }}')"
                         class="p-4 rounded-xl border-2 transition-all active:scale-95 min-h-[80px]
-                               {{ $table->isLibre() ? 'border-green-500/50 bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:border-green-400' : 'border-red-500/30 bg-red-500/5 text-red-400/60 cursor-not-allowed' }}"
-                        {{ !$table->isLibre() ? 'disabled' : '' }}>
-                    <div class="text-lg font-bold">{{ $table->name }}</div>
-                    <div class="text-xs mt-1">{{ $table->zone ? $table->zone : '' }}</div>
+                               {{ $isClickable ? 'border-green-500/50 bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:border-green-400' : ($tc === 'yellow' ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400' : ($tc === 'blue' ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : 'border-red-500/30 bg-red-500/5 text-red-400/60 cursor-not-allowed')) }}"
+                        {{ !$isClickable ? 'disabled' : '' }}>
+                    <div class="text-lg font-bold">{{ $tbl->name }}</div>
+                    <div class="text-xs mt-1">{{ $tbl->zone ? $tbl->zone : '' }}</div>
                     <div class="text-xs mt-0.5">
-                        @if($table->isLibre())<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> Libre</span>
-                        @else<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Occupée</span>@endif
+                        <span class="inline-flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $tc === 'green' ? 'bg-green-400' : ($tc === 'yellow' ? 'bg-yellow-400 animate-pulse' : ($tc === 'blue' ? 'bg-blue-400 animate-pulse' : 'bg-red-400')) }}"></span>
+                            {{ $tLabel }}
+                        </span>
                     </div>
                 </button>
             @endforeach
@@ -52,9 +68,13 @@
 
     <!-- LEFT: PRODUITS -->
     <div class="flex-1 flex flex-col min-w-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border-r border-gray-200/50 dark:border-slate-700/50">
-        <!-- Barre info table -->
+        <!-- Barre info table + bouton retour plan de salle -->
         <div class="bg-slate-800 dark:bg-slate-950 text-white px-4 py-2 flex items-center justify-between flex-shrink-0">
             <div class="flex items-center gap-3">
+                <button @click="returnToFloorPlan()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    Plan de salle
+                </button>
                 <span class="text-sm font-bold" x-text="selectedTableName"></span>
                 <span class="text-xs text-gray-400" x-text="'(' + cartItemCount + ' articles)'"></span>
             </div>
@@ -78,7 +98,15 @@
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 <template x-for="product in filteredProducts" :key="product.id">
                     <button @click="openAddToCartModal(product)"
-                            class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-slate-700/50 hover:border-slate-400 dark:hover:border-slate-500 hover:shadow-lg transition-all p-3 flex flex-col items-center text-center gap-2 min-h-[150px] active:scale-95 select-none">
+                            :disabled="product.track_inventory && product.stock_quantity <= 0"
+                            :class="product.track_inventory && product.stock_quantity <= 0 ? 'opacity-50 cursor-not-allowed' : ''"
+                            class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-slate-700/50 hover:border-slate-400 dark:hover:border-slate-500 hover:shadow-lg transition-all p-3 flex flex-col items-center text-center gap-2 min-h-[150px] active:scale-95 select-none relative">
+                        <!-- Badge stock critique -->
+                        <span x-show="product.track_inventory && product.stock_quantity <= product.stock_alert_threshold && product.stock_quantity > 0" class="absolute top-2 right-2 w-3 h-3 bg-orange-500 rounded-full" title="Stock critique"></span>
+                        <span x-show="product.track_inventory && product.stock_quantity <= 0" class="absolute top-2 right-2 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded">RUPTURE</span>
+                        <!-- Badge route -->
+                        <span x-show="product.kitchen_route === 'bar'" class="absolute top-2 left-2 px-1.5 py-0.5 bg-purple-500 text-white text-[9px] font-bold rounded">BAR</span>
+                        <span x-show="product.kitchen_route === 'counter'" class="absolute top-2 left-2 px-1.5 py-0.5 bg-cyan-500 text-white text-[9px] font-bold rounded">COMPTOIR</span>
                         <div class="w-full h-24 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                             <template x-if="product.image"><img :src="'/storage/' + product.image" :alt="product.name" class="w-full h-full object-cover" /></template>
                             <template x-if="!product.image"><svg class="w-10 h-10 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></template>
@@ -106,7 +134,11 @@
             <template x-for="(item, index) in cart" :key="index">
                 <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3 flex items-center gap-3">
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" x-text="item.name"></p>
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" x-text="item.name"></p>
+                            <span x-show="item.kitchen_route === 'bar'" class="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[9px] font-bold rounded flex-shrink-0">BAR</span>
+                            <span x-show="item.kitchen_route === 'counter'" class="px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 text-[9px] font-bold rounded flex-shrink-0">COMPTOIR</span>
+                        </div>
                         <p class="text-xs text-gray-500 dark:text-gray-400"><span x-text="formatMoney(item.price)"></span> × <span x-text="item.quantity"></span></p>
                         <p class="text-xs text-gray-400 dark:text-gray-500" x-show="item.notes" x-text="'📝 ' + item.notes"></p>
                     </div>
@@ -124,7 +156,7 @@
                 <p class="text-sm">Panier vide</p>
             </div>
         </div>
-        <!-- Totaux + Bouton -->
+        <!-- Totals + Send to Kitchen button -->
         <div class="border-t border-gray-200/50 dark:border-slate-700/50 bg-white/90 dark:bg-slate-800/90 px-4 py-3 flex-shrink-0 space-y-2">
             <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                 <span>Sous-total</span>
@@ -141,21 +173,27 @@
                     <span class="block text-sm text-gray-500 dark:text-gray-400 font-medium" x-text="formatUSD(grandTotal)"></span>
                 </div>
             </div>
-            <button @click="openCheckout()" :disabled="cart.length === 0"
+            <button @click="submitOrder()" :disabled="cart.length === 0 || isSubmitting"
                     :class="cart.length === 0 ? 'bg-gray-300 dark:bg-slate-700 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-[0.98]'"
                     class="w-full py-3.5 rounded-xl text-white font-bold text-base shadow-lg transition-all mt-2">
-                <span x-show="cart.length > 0">Envoyer en Cuisine — <span x-text="formatMoney(grandTotal)"></span></span>
-                <span x-show="cart.length === 0">Panier vide</span>
+                <span x-show="!isSubmitting && cart.length > 0">📤 Envoyer en Cuisine — <span x-text="formatMoney(grandTotal)"></span></span>
+                <span x-show="!isSubmitting && cart.length === 0">Panier vide</span>
+                <span x-show="isSubmitting" class="flex items-center justify-center gap-2"><svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Envoi...</span>
             </button>
         </div>
     </div>
 
-    <!-- MODALE AJOUT PRODUIT -->
+    <!-- MODALE AJOUT PRODUIT (qty + notes) -->
     <div x-show="showAddModal" x-transition class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" @click.self="showAddModal = false" style="display: none;">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div class="bg-slate-900 dark:bg-slate-950 text-white px-5 py-4">
                 <h3 class="text-lg font-bold" x-text="addModalProduct?.name ?? ''"></h3>
                 <p class="text-sm text-gray-400 mt-0.5"><span x-text="formatMoney(addModalProduct?.price ?? 0)"></span><span class="text-gray-500 ml-2" x-text="formatUSD(addModalProduct?.price ?? 0)"></span></p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <span x-show="addModalProduct?.kitchen_route === 'bar'" class="text-purple-400">🍺 Envoyé au Bar (pas de préparation cuisine)</span>
+                    <span x-show="addModalProduct?.kitchen_route === 'counter'" class="text-cyan-400">🥤 Servi au comptoir</span>
+                    <span x-show="!addModalProduct?.kitchen_route || addModalProduct?.kitchen_route === 'kitchen'" class="text-yellow-400">👨‍🍳 Envoyé en cuisine (KDS)</span>
+                </p>
             </div>
             <div class="p-5 space-y-5">
                 <div>
@@ -177,93 +215,6 @@
             </div>
         </div>
     </div>
-
-    <!-- MODALE PAIEMENT -->
-    <div x-show="showPaymentModal" x-transition class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" @click.self="showPaymentModal = false" style="display: none;">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="bg-slate-900 dark:bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
-                <div><h3 class="text-lg font-bold">Paiement</h3><p class="text-sm text-gray-400" x-text="selectedTableName"></p></div>
-                <div class="text-right"><span class="text-2xl font-bold" x-text="formatMoney(paymentTotal)"></span><span class="block text-sm text-gray-400" x-text="formatUSD(paymentTotal)"></span></div>
-            </div>
-            <div class="p-5 space-y-5">
-                <div>
-                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-3">Mode de paiement</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <label :class="paymentMethod === 'cash' ? 'border-green-500 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-500' : 'border-gray-200 dark:border-slate-600'" class="flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 cursor-pointer transition-all">
-                            <input type="radio" x-model="paymentMethod" value="cash" class="sr-only" />
-                            <svg class="w-7 h-7" :class="paymentMethod === 'cash' ? 'text-green-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                            <span class="text-xs font-medium" :class="paymentMethod === 'cash' ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'">Cash</span>
-                        </label>
-                        <label :class="paymentMethod === 'mobile_money' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500' : 'border-gray-200 dark:border-slate-600'" class="flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 cursor-pointer transition-all">
-                            <input type="radio" x-model="paymentMethod" value="mobile_money" class="sr-only" />
-                            <svg class="w-7 h-7" :class="paymentMethod === 'mobile_money' ? 'text-blue-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                            <span class="text-xs font-medium" :class="paymentMethod === 'mobile_money' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'">Mobile Money</span>
-                        </label>
-                        <label :class="paymentMethod === 'credit' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-500' : 'border-gray-200 dark:border-slate-600'" class="flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 cursor-pointer transition-all">
-                            <input type="radio" x-model="paymentMethod" value="credit" class="sr-only" />
-                            <svg class="w-7 h-7" :class="paymentMethod === 'credit' ? 'text-orange-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                            <span class="text-xs font-medium" :class="paymentMethod === 'credit' ? 'text-orange-700 dark:text-orange-300' : 'text-gray-600 dark:text-gray-400'">Crédit</span>
-                        </label>
-                    </div>
-                </div>
-                <template x-if="paymentMethod === 'cash'">
-                    <div class="space-y-3">
-                        <div>
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Montant reçu (FC)</label>
-                            <input type="number" x-model.number="cashReceived" min="0" step="100" @input="calculateChange()" class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-lg text-right font-semibold min-h-[48px] focus:ring-2 focus:ring-green-500" placeholder="0">
-                        </div>
-                        <div class="rounded-xl p-4 text-center" :class="changeGiven >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'">
-                            <p class="text-xs uppercase tracking-wide mb-1" :class="changeGiven >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">Monnaie à rendre</p>
-                            <p class="text-2xl font-bold" :class="changeGiven >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"><span x-text="formatMoney(Math.abs(changeGiven))"></span></p>
-                            <p class="text-xs mt-1" :class="changeGiven >= 0 ? 'text-green-500' : 'text-red-500'" x-text="formatUSD(Math.abs(changeGiven))"></p>
-                        </div>
-                    </div>
-                </template>
-                <template x-if="paymentMethod === 'mobile_money'">
-                    <div>
-                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Référence de transaction</label>
-                        <input type="text" x-model="paymentReference" class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-sm min-h-[48px] focus:ring-2 focus:ring-blue-500" placeholder="Ex: MOMO-XXXX-XXXX">
-                    </div>
-                </template>
-                <template x-if="paymentMethod === 'credit'">
-                    <div class="space-y-3">
-                        <div>
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Nom du client</label>
-                            <input type="text" x-model="customerName" class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-sm min-h-[48px] focus:ring-2 focus:ring-orange-500" placeholder="Nom complet">
-                        </div>
-                        <div>
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Téléphone</label>
-                            <input type="tel" x-model="customerPhone" class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-sm min-h-[48px] focus:ring-2 focus:ring-orange-500" placeholder="+243 XX XXX XXXX">
-                        </div>
-                    </div>
-                </template>
-            </div>
-            <div class="px-5 py-4 border-t border-gray-200 dark:border-slate-700 flex gap-3">
-                <button @click="showPaymentModal = false" class="flex-1 py-3 rounded-xl border-2 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">Annuler</button>
-                <button @click="processPayment()" :disabled="isProcessing" :class="isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'" class="flex-1 py-3 rounded-xl text-white font-semibold text-sm shadow-md transition-all">
-                    <span x-show="!isProcessing">Valider le paiement</span>
-                    <span x-show="isProcessing" class="flex items-center justify-center gap-2"><svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Traitement...</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Cancel Modal -->
-    <div x-show="showCancelModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" @click.self="showCancelModal = false" style="display: none;">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div class="bg-red-600 text-white px-5 py-4"><h3 class="text-lg font-bold">Annuler la commande</h3></div>
-            <div class="p-5 space-y-4">
-                <div>
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Motif d'annulation <span class="text-red-500">*</span></label>
-                    <textarea x-model="cancelReason" rows="3" required class="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500" placeholder="Ex: Client a changé d'avis..."></textarea>
-                </div>
-            </div>
-            <div class="px-5 py-4 border-t border-gray-200 dark:border-slate-700 flex gap-3">
-                <button @click="showCancelModal = false" class="flex-1 py-2.5 rounded-xl border-2 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 font-medium text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">Retour</button>
-                <button @click="confirmCancel()" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-sm transition-colors">Confirmer</button>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -273,28 +224,16 @@ function posWorkflow() {
         categories: @json($categories ?? []),
         activeCategory: null,
         cart: [],
-        orders: @json($todayOrders ?? []),
-        selectedOrder: null,
-        showPaymentModal: false,
-        showCancelModal: false,
-        showAddModal: false,
-        cancelReason: '',
-        cancelTargetOrder: null,
-        paymentMethod: 'cash',
-        cashReceived: 0,
-        changeGiven: 0,
-        paymentReference: '',
-        customerName: '',
-        customerPhone: '',
-        paymentTotal: 0,
-        isProcessing: false,
-        taxRate: {{ $restaurant->tax_rate ?? 0 }},
         selectedTable: null,
         selectedTableName: '',
         tableSelected: false,
+        showAddModal: false,
         addModalProduct: null,
         addModalQty: 1,
         addModalNotes: '',
+        isSubmitting: false,
+        currentOrderId: null,
+        taxRate: {{ $restaurant->tax_rate ?? 0 }},
         exchangeRate: {{ \App\Models\SiteSetting::getValue('exchange_rate', 2850) }},
         defaultCurrency: '{{ \App\Models\SiteSetting::getValue('default_currency', 'FC') }}',
         secondaryCurrency: '{{ \App\Models\SiteSetting::getValue('secondary_currency', 'USD') }}',
@@ -305,30 +244,37 @@ function posWorkflow() {
         },
         get cartItemCount() { return this.cart.reduce((sum, item) => sum + item.quantity, 0); },
         get subtotal() { return this.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0); },
-        get discount() { return 0; },
         get tax() { return this.subtotal * (this.taxRate / 100); },
         get grandTotal() { return Math.max(0, this.subtotal + this.tax); },
-        get enCoursOrders() { return this.orders.filter(o => o.status === 'en_cours'); },
-        get enAttenteOrders() { return this.orders.filter(o => o.status === 'en_attente'); },
-        get payeeOrders() { return this.orders.filter(o => o.status === 'payee' || o.status === 'paid'); },
-        get enCoursCount() { return this.enCoursOrders.length; },
-        get enAttenteCount() { return this.enAttenteOrders.length; },
-        get payeeCount() { return this.payeeOrders.length; },
 
-        init() { this.pollOrders(); },
+        init() {},
 
         selectTable(tableId, tableName) {
             this.selectedTable = tableId;
             this.selectedTableName = tableName;
             this.tableSelected = true;
+            this.cart = [];
+            this.currentOrderId = null;
         },
+
         changeTable() {
             if (this.cart.length > 0 && !confirm('Le panier en cours sera perdu. Changer de table ?')) return;
             this.cart = [];
             this.tableSelected = false;
             this.selectedTable = null;
             this.selectedTableName = '';
+            this.currentOrderId = null;
         },
+
+        returnToFloorPlan() {
+            if (this.cart.length > 0 && !confirm('Retourner au plan de salle ? Le panier en cours sera perdu.')) return;
+            this.cart = [];
+            this.tableSelected = false;
+            this.selectedTable = null;
+            this.selectedTableName = '';
+            this.currentOrderId = null;
+        },
+
         formatMoney(amount) {
             const val = parseFloat(amount) || 0;
             return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val) + ' ' + this.defaultCurrency;
@@ -339,112 +285,111 @@ function posWorkflow() {
             const usd = val / this.exchangeRate;
             return '≈ ' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(usd) + ' ' + this.secondaryCurrency;
         },
+
         openAddToCartModal(product) {
+            // Bloquer si rupture de stock
+            if (product.track_inventory && product.stock_quantity <= 0) {
+                alert('❌ Produit en rupture de stock — impossible d\'ajouter au panier.');
+                return;
+            }
             this.addModalProduct = product;
             this.addModalQty = 1;
             this.addModalNotes = '';
             this.showAddModal = true;
         },
+
         confirmAddToCart() {
             if (!this.addModalProduct || this.addModalQty < 1) return;
+
+            // Vérifier le stock disponible
+            const product = this.products.find(p => p.id === this.addModalProduct.id);
+            if (product && product.track_inventory) {
+                const inCart = this.cart.filter(i => i.id === this.addModalProduct.id).reduce((s, i) => s + i.quantity, 0);
+                if (inCart + this.addModalQty > product.stock_quantity) {
+                    alert('Stock insuffisant. Disponible: ' + (product.stock_quantity - inCart));
+                    return;
+                }
+            }
+
             const existing = this.cart.find(item => item.id === this.addModalProduct.id);
             if (existing) {
                 existing.quantity += this.addModalQty;
                 if (this.addModalNotes) existing.notes = this.addModalNotes;
             } else {
-                this.cart.push({ id: this.addModalProduct.id, name: this.addModalProduct.name, price: parseFloat(this.addModalProduct.price), quantity: this.addModalQty, notes: this.addModalNotes });
+                this.cart.push({
+                    id: this.addModalProduct.id,
+                    name: this.addModalProduct.name,
+                    price: parseFloat(this.addModalProduct.price),
+                    quantity: this.addModalQty,
+                    notes: this.addModalNotes,
+                    kitchen_route: this.addModalProduct.kitchen_route || 'kitchen',
+                    track_inventory: this.addModalProduct.track_inventory,
+                });
             }
             this.showAddModal = false;
         },
+
         removeFromCart(index) { this.cart.splice(index, 1); },
         clearCart() { if (confirm('Vider le panier ?')) this.cart = []; },
-        openCheckout() {
-            if (this.cart.length === 0) return;
-            this.paymentTotal = this.grandTotal;
-            this.cashReceived = 0;
-            this.changeGiven = 0;
-            this.paymentReference = '';
-            this.customerName = '';
-            this.customerPhone = '';
-            this.paymentMethod = 'cash';
-            this.showPaymentModal = true;
-        },
-        calculateChange() {
-            const received = parseFloat(this.cashReceived) || 0;
-            this.changeGiven = received - this.paymentTotal;
-        },
-        async processPayment() {
-            if (this.isProcessing) return;
-            if (this.paymentMethod === 'cash') { const r = parseFloat(this.cashReceived) || 0; if (r < this.paymentTotal) { alert('Montant insuffisant.'); return; } }
-            if (this.paymentMethod === 'mobile_money' && !this.paymentReference.trim()) { alert('Référence requise.'); return; }
-            if (this.paymentMethod === 'credit' && (!this.customerName.trim() || !this.customerPhone.trim())) { alert('Nom et téléphone requis.'); return; }
-            this.isProcessing = true;
+
+        /**
+         * ── Soumettre la commande (création + routage) ──
+         * FIX BUG: Gestion propre des erreurs, validation côte serveur,
+         * réponse JSON structurée, pas de 500 silencieux.
+         */
+        async submitOrder() {
+            if (this.cart.length === 0 || this.isSubmitting) return;
+            this.isSubmitting = true;
+
             try {
-                let orderId = this._payingOrderId;
-                if (!orderId) {
-                    const cr = await fetch('{{ route("pos.order.store") }}', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                        body: JSON.stringify({
-                            items: this.cart.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price, notes: i.notes })),
-                            payment_method: this.paymentMethod, discount_amount: 0, tax_amount: this.tax, total: this.grandTotal,
-                            cash_received: parseFloat(this.cashReceived) || 0, change_given: this.changeGiven,
-                            payment_reference: this.paymentReference, customer_name: this.customerName, customer_phone: this.customerPhone, table_id: this.selectedTable
-                        })
-                    });
-                    const cd = await cr.json();
-                    if (!cd.success) { alert(cd.message || 'Erreur.'); this.isProcessing = false; return; }
-                    orderId = cd.order_id || cd.id;
-                }
-                const pr = await fetch(`/pos/order/${orderId}/pay`, {
+                const payload = {
+                    items: this.cart.map(i => ({
+                        product_id: i.id,
+                        quantity: i.quantity,
+                        unit_price: i.price,
+                        notes: i.notes || null,
+                    })),
+                    payment_method: 'cash',
+                    discount_amount: 0,
+                    tax_amount: this.tax,
+                    total: this.grandTotal,
+                    table_id: this.selectedTable,
+                    notes: null,
+                };
+
+                const response = await fetch('{{ route("pos.order.store") }}', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                    body: JSON.stringify({ payment_method: this.paymentMethod, payment_reference: this.paymentReference, cash_received: parseFloat(this.cashReceived) || 0, customer_name: this.customerName, customer_phone: this.customerPhone })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify(payload),
                 });
-                const pd = await pr.json();
-                if (pd.success) {
-                    if (pd.receipt_html) { const w = window.open('', '_blank', 'width=400,height=700'); w.document.write(pd.receipt_html); w.document.close(); }
-                    this.cart = []; this.showPaymentModal = false; this.selectedOrder = null; this._payingOrderId = null;
-                    this.orders = this.orders.filter(o => o.id !== orderId);
-                    this.orders.push({ id: orderId, status: 'payee', order_number: pd.order_number, total_amount: pd.total, items_count: 0, cashier_name: '{{ auth()->user()->name }}', created_at_human: "À l'instant", items: [] });
-                } else { alert(pd.message || 'Erreur.'); }
-            } catch(e) { console.error(e); alert('Erreur.'); }
-            this.isProcessing = false;
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Vider le panier et retourner au plan de salle
+                    this.cart = [];
+                    this.currentOrderId = data.order_id;
+                    alert('✅ ' + data.message);
+
+                    // Retour automatique au plan de salle après succès
+                    this.tableSelected = false;
+                    this.selectedTable = null;
+                    this.selectedTableName = '';
+                } else {
+                    // Afficher l'erreur retournée par le serveur
+                    alert('❌ ' + (data.message || 'Erreur lors de la soumission.'));
+                }
+            } catch (error) {
+                console.error('Submit order error:', error);
+                alert('❌ Erreur de connexion. Vérifiez votre réseau et réessayez.');
+            } finally {
+                this.isSubmitting = false;
+            }
         },
-        selectOrder(order) { this.selectedOrder = order; },
-        async markReady(order) {
-            try {
-                const r = await fetch(`/pos/order/${order.id}/ready`, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
-                const d = await r.json();
-                if (d.success) { order.status = 'en_attente'; this.selectedOrder = null; } else { alert(d.message); }
-            } catch(e) { alert('Erreur.'); }
-        },
-        payOrder(order) {
-            this.paymentTotal = order.total_amount; this.cashReceived = 0; this.changeGiven = 0;
-            this.paymentReference = ''; this.customerName = ''; this.customerPhone = '';
-            this.paymentMethod = 'cash'; this.showPaymentModal = true; this._payingOrderId = order.id;
-        },
-        cancelOrder(order) { this.cancelTargetOrder = order; this.cancelReason = ''; this.showCancelModal = true; },
-        async confirmCancel() {
-            if (!this.cancelReason.trim()) { alert('Motif obligatoire.'); return; }
-            try {
-                const r = await fetch(`/pos/order/${this.cancelTargetOrder.id}/cancel`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                    body: JSON.stringify({ reason: this.cancelReason })
-                });
-                const d = await r.json();
-                if (d.success) { this.cancelTargetOrder.status = 'annulee'; this.showCancelModal = false; this.selectedOrder = null; } else { alert(d.message); }
-            } catch(e) { alert('Erreur.'); }
-        },
-        printReceipt(order) { window.open(`/pos/order/${order.id}/receipt`, '_blank', 'width=400,height=700'); },
-        pollOrders() {
-            setInterval(async () => {
-                try {
-                    const r = await fetch('{{ route("pos.unsettled") }}', { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
-                    if (r.ok) { const d = await r.json(); if (d.orders) { d.orders.forEach(no => { const e = this.orders.find(o => o.id === no.id); if (e) Object.assign(e, no); else this.orders.push(no); }); } }
-                } catch(e) { console.error('Poll error:', e); }
-            }, 10000);
-        }
     };
 }
 </script>

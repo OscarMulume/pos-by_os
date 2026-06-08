@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [PosController::class, 'index'])->name('index');
         Route::post('/order', [OrderController::class, 'store'])->name('order.store');
         Route::post('/order/{order}/ready', [OrderController::class, 'markReady'])->name('order.ready');
+        Route::post('/order/{order}/deliver', [OrderController::class, 'markDelivered'])->name('order.deliver');
         Route::post('/order/{order}/pay', [OrderController::class, 'pay'])->name('order.pay');
         Route::post('/order/{order}/cancel', [OrderController::class, 'cancel'])->name('order.cancel');
         Route::get('/order/{order}/receipt', [OrderController::class, 'receipt'])->name('order.receipt');
@@ -147,6 +148,13 @@ Route::middleware('auth')->group(function () {
 
         // Réinitialisation PIN employé
         Route::post('/users/{user}/reset-pin', [UserController::class, 'resetPin'])->name('users.reset-pin');
+
+        // ═══════════════════════════════════════════════════════════
+        // SUPERVISION SALLE — Plan de salle temps réel (SLA)
+        // ═══════════════════════════════════════════════════════════
+        Route::get('/floor-plan', [App\Http\Controllers\Admin\FloorPlanController::class, 'index'])->name('floor-plan.index');
+        Route::get('/floor-plan/data', [App\Http\Controllers\Admin\FloorPlanController::class, 'data'])->name('floor-plan.data');
+        Route::get('/floor-plan/table/{table}', [App\Http\Controllers\Admin\FloorPlanController::class, 'tableDetails'])->name('floor-plan.table');
     });
 });
 });

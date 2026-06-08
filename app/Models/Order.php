@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\RestaurantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,32 +12,49 @@ class Order extends Model
 {
     use HasFactory;
 
-    // Statuts de commande
-    const STATUS_EN_COURS = 'en_cours';
-    const STATUS_EN_ATTENTE = 'en_attente';
-    const STATUS_PAYEE = 'payee';
-    const STATUS_ANNULEE = 'annulee';
+    // ── Statuts de commande (State Machine) ──
+    const STATUS_PENDING         = 'pending';
+    const STATUS_SENT_TO_KITCHEN = 'sent_to_kitchen';
+    const STATUS_READY           = 'ready';
+    const STATUS_DELIVERED       = 'delivered';
+    const STATUS_PAID            = 'paid';
+    const STATUS_ANNULEE         = 'annulee';
 
-    // Statuts cuisine (KDS)
-    const KITCHEN_EN_ATTENTE = 'en_attente';
-    const KITCHEN_EN_PREPARATION = 'en_preparation';
-    const KITCHEN_PRET = 'pret';
+    // ── Statuts cuisine (KDS) ──
+    const KITCHEN_EN_ATTENTE      = 'en_attente';
+    const KITCHEN_EN_PREPARATION  = 'en_preparation';
+    const KITCHEN_PRET            = 'pret';
 
     protected $fillable = [
-        'restaurant_id', 'pos_terminal_id', 'user_id', 'table_id', 'order_number', 'total_amount',
+        'restaurant_id', 'pos_terminal_id', 'user_id', 'table_id',
+        'order_number', 'total_amount',
         'tax_amount', 'discount_amount', 'payment_method', 'payment_reference',
         'cash_received', 'change_given', 'customer_name', 'customer_phone',
-        'status', 'kitchen_status', 'sent_to_kitchen_at', 'ready_at',
+        'status', 'kitchen_status',
+        'sent_to_kitchen_at', 'ready_at', 'delivered_at',
         'cancelled_by', 'cancellation_reason', 'notes',
     ];
 
     protected $casts = [
-        'total_amount' => 'decimal:2',
-        'tax_amount' => 'decimal:2',
+        'total_amount'    => 'decimal:2',
+        'tax_amount'      => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'cash_received' => 'decimal:2',
-        'change_given' => 'decimal:2',
+        'cash_received'   => 'decimal:2',
+        'change_given'    => 'decimal:2',
+        'sent_to_kitchen_at' => 'datetime',
+        'ready_at'         => 'datetime',
+        'delivered_at'     => 'datetime',
     ];
+
+    /**
+     * Global Scope multi-tenant
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new RestaurantScope());
+    }
+
+    // ── Relations ──
 
     public function restaurant(): BelongsTo
     {
@@ -68,7 +86,8 @@ class Order extends Model
         return $this->belongsTo(PosTerminal::class);
     }
 
-    // Scopes
+    // ── Scopes ──
+
     public function scopeToday($query)
     {
         return $query->whereDate('created_at', today());
@@ -76,7 +95,7 @@ class Order extends Model
 
     public function scopePaid($query)
     {
-        return $query->where('status', self::STATUS_PAYEE);
+        return $query->where('status', self::STATUS_PAID);
     }
 
     public function scopeCancelled($query)
@@ -84,14 +103,24 @@ class Order extends Model
         return $query->where('status', self::STATUS_ANNULEE);
     }
 
-    public function scopeEnCours($query)
+    public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_EN_COURS);
+        return $query->where('status', self::STATUS_PENDING);
     }
 
-    public function scopeEnAttente($query)
+    public function scopeSentToKitchen($query)
     {
-        return $query->where('status', self::STATUS_EN_ATTENTE);
+        return $query->where('status', self::STATUS_SENT_TO_KITCHEN);
+    }
+
+    public function scopeReady($query)
+    {
+        return $query->where('status', self::STATUS_READY);
+    }
+
+    public function scopeDelivered($query)
+    {
+        return $query->where('status', self::STATUS_DELIVERED);
     }
 
     public function scopeByRestaurant($query, int $restaurantId)
@@ -109,20 +138,31 @@ class Order extends Model
         return $query->where('payment_method', $method);
     }
 
-    // Helpers
-    public function isEnCours(): bool
+    // ── State checks ──
+
+    public function isPending(): bool
     {
-        return $this->status === self::STATUS_EN_COURS;
+        return $this->status === self::STATUS_PENDING;
     }
 
-    public function isEnAttente(): bool
+    public function isSentToKitchen(): bool
     {
-        return $this->status === self::STATUS_EN_ATTENTE;
+        return $this->status === self::STATUS_SENT_TO_KITCHEN;
     }
 
-    public function isPayee(): bool
+    public function isReady(): bool
     {
-        return $this->status === self::STATUS_PAYEE;
+        return $this->status === self::STATUS_READY;
+    }
+
+    public function isDelivered(): bool
+    {
+        return $this->status === self::STATUS_DELIVERED;
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === self::STATUS_PAID;
     }
 
     public function isAnnulee(): bool
@@ -132,69 +172,86 @@ class Order extends Model
 
     public function canBeCancelled(): bool
     {
-        return in_array($this->status, [self::STATUS_EN_COURS, self::STATUS_EN_ATTENTE]);
+        return in_array($this->status, [
+            self::STATUS_PENDING,
+            self::STATUS_SENT_TO_KITCHEN,
+            self::STATUS_READY,
+        ]);
     }
 
     public function canBePaid(): bool
     {
-        return in_array($this->status, [self::STATUS_EN_COURS, self::STATUS_EN_ATTENTE]);
+        return in_array($this->status, [
+            self::STATUS_READY,
+            self::STATUS_DELIVERED,
+        ]);
     }
 
-    // Labels
+    public function canBeSentToKitchen(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    // ── Labels ──
+
     public function getPaymentMethodLabelAttribute(): string
     {
         return match ($this->payment_method) {
-            'cash' => 'Espèces',
+            'cash'         => 'Espèces',
             'mobile_money' => 'Mobile Money',
-            'credit' => 'Crédit',
-            default => $this->payment_method,
+            'credit'       => 'Crédit',
+            default        => $this->payment_method,
         };
     }
 
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            self::STATUS_EN_COURS => 'En cours',
-            self::STATUS_EN_ATTENTE => 'En attente',
-            self::STATUS_PAYEE => 'Payée',
-            self::STATUS_ANNULEE => 'Annulée',
-            default => $this->status,
+            self::STATUS_PENDING         => 'Brouillon',
+            self::STATUS_SENT_TO_KITCHEN => 'En cuisine',
+            self::STATUS_READY           => 'Prêt à servir',
+            self::STATUS_DELIVERED       => 'Servi',
+            self::STATUS_PAID            => 'Payée',
+            self::STATUS_ANNULEE         => 'Annulée',
+            default                      => $this->status,
         };
     }
 
     public function getStatusColorAttribute(): string
     {
         return match ($this->status) {
-            self::STATUS_EN_COURS => 'blue',
-            self::STATUS_EN_ATTENTE => 'yellow',
-            self::STATUS_PAYEE => 'green',
-            self::STATUS_ANNULEE => 'red',
-            default => 'gray',
+            self::STATUS_PENDING         => 'gray',
+            self::STATUS_SENT_TO_KITCHEN => 'yellow',
+            self::STATUS_READY           => 'blue',
+            self::STATUS_DELIVERED       => 'indigo',
+            self::STATUS_PAID            => 'green',
+            self::STATUS_ANNULEE         => 'red',
+            default                      => 'gray',
         };
     }
 
-    // Labels
     public function getKitchenStatusLabelAttribute(): string
     {
         return match ($this->kitchen_status) {
-            self::KITCHEN_EN_ATTENTE => 'En attente',
+            self::KITCHEN_EN_ATTENTE     => 'En attente',
             self::KITCHEN_EN_PREPARATION => 'En préparation',
-            self::KITCHEN_PRET => 'Prêt',
-            default => $this->kitchen_status ?? '—',
+            self::KITCHEN_PRET           => 'Prêt',
+            default                      => $this->kitchen_status ?? '—',
         };
     }
 
     public function getKitchenStatusColorAttribute(): string
     {
         return match ($this->kitchen_status) {
-            self::KITCHEN_EN_ATTENTE => 'yellow',
+            self::KITCHEN_EN_ATTENTE     => 'yellow',
             self::KITCHEN_EN_PREPARATION => 'blue',
-            self::KITCHEN_PRET => 'green',
-            default => 'gray',
+            self::KITCHEN_PRET           => 'green',
+            default                      => 'gray',
         };
     }
 
-    // Temps d'attente en cuisine (minutes)
+    // ── Temps d'attente ──
+
     public function getKitchenWaitMinutes(): ?int
     {
         if (!$this->sent_to_kitchen_at) return null;
@@ -202,7 +259,6 @@ class Order extends Model
         return (int) $this->sent_to_kitchen_at->diffInMinutes($end);
     }
 
-    // Couleur du minuteur cuisine
     public function getKitchenTimerColor(): string
     {
         $mins = $this->getKitchenWaitMinutes();
@@ -212,15 +268,16 @@ class Order extends Model
         return 'red';
     }
 
-    // Motifs d'annulation disponibles
+    // ── Motifs d'annulation ──
+
     public static function getCancellationReasons(): array
     {
         return [
-            'rupture_stock' => 'Rupture de stock',
+            'rupture_stock'     => 'Rupture de stock',
             'client_insatisfait' => 'Client insatisfait',
-            'erreur_commande' => 'Erreur de commande',
+            'erreur_commande'   => 'Erreur de commande',
             'probleme_paiement' => 'Problème de paiement',
-            'autre' => 'Autre',
+            'autre'             => 'Autre',
         ];
     }
 }
