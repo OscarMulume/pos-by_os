@@ -1,0 +1,52 @@
+# ═══════════════════════════════════════════════════════════
+# Render.com Blueprint — POS Pro
+# ═══════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: pos-pro-msec
+    runtime: php
+    plan: free
+    buildCommand: bash deploy.sh
+    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        value: https://pos-pro-msec.onrender.com
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: pos-pro-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: pos-pro-db
+          property: port
+      - key: DB_DATABASE
+        value: postgres
+      - key: DB_USERNAME
+        fromDatabase:
+          name: pos-pro-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: pos-pro-db
+          property: password
+      - key: DB_SSLMODE
+        value: require
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+
+databases:
+  - name: pos-pro-db
+    plan: free
+    databaseName: pos_pro
+    user: pos_pro_user

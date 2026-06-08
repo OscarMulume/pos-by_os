@@ -186,5 +186,8 @@ Route::middleware('auth')->prefix('pos')->name('pos.')->group(function () {
 // Page hors-ligne
 Route::get('/offline', fn() => view('offline'))->name('offline');
 
+// Webhook GitHub — Déploiement automatique (hors auth)
+Route::post('/webhook/deploy', [App\Http\Controllers\DeployController::class, 'webhook']);
+
 // Manifest PWA
 Route::get('/manifest.json', fn() => response()->file(public_path('manifest.json')));
