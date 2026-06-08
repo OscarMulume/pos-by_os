@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/.schema/config.schema.json",
+  "productName": "POS Pro",
+  "version": "1.3.0",
+  "identifier": "com.msec.pospro",
+  "build": {
+    "frontendDist": "../desktop-app",
+    "devUrl": "http://localhost:8000",
+    "beforeBuildCommand": "",
+    "beforeDevCommand": ""
+  },
+  "app": {
+    "title": "POS Pro - M-SEC Technology Consulting",
+    "windows": [
+      {
+        "title": "POS Pro - M-SEC Technology Consulting",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "scheme": "https",
+          "domain": "pos-pro-msec.onrender.com",
+          "windows": ["main"],
+          "enableTauriAPI": false
+        },
+        {
+          "scheme": "https",
+          "domain": "*.supabase.co",
+          "windows": ["main"],
+          "enableTauriAPI": false
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "M-SEC Technology Consulting",
+    "copyright": "© 2026 Oscar Mulume Izuba. Tous droits reserves.",
+    "category": "Business",
+    "shortDescription": "POS Pro - Systeme de Point de Vente",
+    "longDescription": "POS Pro v1.3 - Solution complete de gestion de point de vente par M-SEC Technology Consulting"
+  }
+}

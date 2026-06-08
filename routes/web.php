@@ -183,6 +183,23 @@ Route::middleware('auth')->prefix('pos')->name('pos.')->group(function () {
     Route::get('/order/{order}/receipt/thermal', [App\Http\Controllers\Pos\ReceiptController::class, 'thermal'])->name('order.receipt.thermal');
 });
 
+// ═══════════════════════════════════════════════════════════
+// API Routes POS Launcher (auth par session — cookies)
+// ═══════════════════════════════════════════════════════════
+Route::middleware('web')->prefix('api/pos')->name('api.pos.')->group(function () {
+    // Login par session (cookie CSRF)
+    Route::post('/login', [App\Http\Controllers\Api\PosApiController::class, 'login']);
+
+    // Routes protégées par auth
+    Route::middleware('auth')->group(function () {
+        Route::get('/products', [App\Http\Controllers\Api\PosApiController::class, 'products'])->name('products');
+        Route::get('/categories', [App\Http\Controllers\Api\PosApiController::class, 'categories'])->name('categories');
+        Route::get('/tables', [App\Http\Controllers\Api\PosApiController::class, 'tables'])->name('tables');
+        Route::get('/restaurant', [App\Http\Controllers\Api\PosApiController::class, 'restaurant'])->name('restaurant');
+        Route::get('/refresh', [App\Http\Controllers\Api\PosApiController::class, 'refresh'])->name('refresh');
+    });
+});
+
 // Page hors-ligne
 Route::get('/offline', fn() => view('offline'))->name('offline');
 
