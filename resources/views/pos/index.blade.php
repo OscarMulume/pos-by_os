@@ -32,11 +32,16 @@
                 @php
                     $tc = $tbl->getStatusColor();
                     $tLabel = $tbl->getStatusLabel();
-                    $isClickable = $tbl->isAvailable();
+                    // Une table est sélectionnable si elle est libre OU si elle a une commande active
+                    // (pour ajouter des items ou imprimer l'addition)
+                    $isClickable = $tbl->isAvailable() || in_array($tbl->status, ['kitchen_processing', 'served_unpaid', 'occupied']);
                 @endphp
                 <button @click="selectTable({{ $tbl->id }}, '{{ $tbl->name }}')"
                         class="p-4 rounded-xl border-2 transition-all active:scale-95 min-h-[80px]
-                               {{ $isClickable ? 'border-green-500/50 bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:border-green-400' : ($tc === 'yellow' ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400' : ($tc === 'blue' ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : 'border-red-500/30 bg-red-500/5 text-red-400/60 cursor-not-allowed')) }}"
+                               {{ $tc === 'green' ? 'border-green-500/50 bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:border-green-400' : '' }}
+                               {{ $tc === 'yellow' ? 'border-yellow-500/50 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 hover:border-yellow-400' : '' }}
+                               {{ $tc === 'blue' ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:border-blue-400' : '' }}
+                               {{ $tc === 'red' ? 'border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:border-red-400' : '' }}"
                         {{ !$isClickable ? 'disabled' : '' }}>
                     <div class="text-lg font-bold">{{ $tbl->name }}</div>
                     <div class="text-xs mt-1">{{ $tbl->zone ? $tbl->zone : '' }}</div>
@@ -46,6 +51,9 @@
                             {{ $tLabel }}
                         </span>
                     </div>
+                    @if($tbl->currentOrder)
+                        <div class="text-[10px] mt-1 text-gray-500">#{{ $tbl->currentOrder->order_number }}</div>
+                    @endif
                 </button>
             @endforeach
         </div>

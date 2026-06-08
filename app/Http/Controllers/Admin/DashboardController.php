@@ -38,10 +38,10 @@ class DashboardController extends Controller
         $ca = Order::where('restaurant_id', $restaurantId)
             ->whereDate('created_at', $today)
             ->selectRaw("
-                COUNT(CASE WHEN status IN ('payee','paid') THEN 1 END) as total_orders,
-                COALESCE(SUM(CASE WHEN status IN ('payee','paid') THEN total_amount ELSE 0 END), 0) as total_revenue,
-                COUNT(CASE WHEN status = 'en_cours' THEN 1 END) as orders_en_cours,
-                COUNT(CASE WHEN status = 'en_attente' THEN 1 END) as orders_en_attente,
+                COUNT(CASE WHEN status IN ('paid','delivered','ready','sent_to_kitchen','pending') THEN 1 END) as total_orders,
+                COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) as total_revenue,
+                COUNT(CASE WHEN status IN ('sent_to_kitchen','pending') THEN 1 END) as orders_en_cours,
+                COUNT(CASE WHEN status IN ('ready','delivered') THEN 1 END) as orders_en_attente,
                 COUNT(CASE WHEN status = 'annulee' THEN 1 END) as orders_annulees
             ")
             ->first();
@@ -50,8 +50,8 @@ class DashboardController extends Controller
         $caYesterday = Order::where('restaurant_id', $restaurantId)
             ->whereDate('created_at', $yesterday)
             ->selectRaw("
-                COUNT(CASE WHEN status IN ('payee','paid') THEN 1 END) as total_orders,
-                COALESCE(SUM(CASE WHEN status IN ('payee','paid') THEN total_amount ELSE 0 END), 0) as total_revenue
+                COUNT(CASE WHEN status IN ('paid','delivered','ready','sent_to_kitchen','pending') THEN 1 END) as total_orders,
+                COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) as total_revenue
             ")
             ->first();
 
@@ -132,20 +132,16 @@ class DashboardController extends Controller
             ->get();
 
         // ═══════════════════════════════════════════
-        // TABLES STATUS
+        // TABLES STATUS (nouveaux statuts)
         // ═══════════════════════════════════════════
-        $tablesFree = \DB::table('restaurant_tables')
-            ->join('pos_terminals', 'restaurant_tables.pos_terminal_id', '=', 'pos_terminals.id')
-            ->where('pos_terminals.restaurant_id', $restaurantId)
-            ->where('restaurant_tables.status', 'libre')
-            ->where('restaurant_tables.is_active', true)
+        $tablesFree = RestaurantTable::where('restaurant_id', $restaurantId)
+            ->where('status', 'available')
+            ->where('is_active', true)
             ->count();
 
-        $tablesOccupied = \DB::table('restaurant_tables')
-            ->join('pos_terminals', 'restaurant_tables.pos_terminal_id', '=', 'pos_terminals.id')
-            ->where('pos_terminals.restaurant_id', $restaurantId)
-            ->where('restaurant_tables.status', 'occupee')
-            ->where('restaurant_tables.is_active', true)
+        $tablesOccupied = RestaurantTable::where('restaurant_id', $restaurantId)
+            ->whereIn('status', ['occupied', 'kitchen_processing', 'served_unpaid'])
+            ->where('is_active', true)
             ->count();
 
         // ═══════════════════════════════════════════

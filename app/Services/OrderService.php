@@ -142,6 +142,52 @@ class OrderService
     }
 
     /**
+     * Déduire les ingrédients (Fiche Technique / BOM) lors de la vente d'un produit.
+     * Parcourt chaque item de la commande, charge ses ingrédients et déduit les quantités.
+     * Retourne un tableau des ingrédients en rupture après déduction.
+     *
+     * @return array ['ingredient_name' => ['required' => X, 'available' => Y]]
+     */
+    public function deductIngredientsForOrder(Order $order): array
+    {
+        $shortages = [];
+
+        DB::transaction(function () use ($order, &$shortages) {
+            foreach ($order->items as $item) {
+                $product = Product::find($item->product_id);
+                if (!$product) continue;
+
+                // Charger les ingrédients de la fiche technique
+                $product->loadMissing('ingredients');
+
+                foreach ($product->ingredients as $ingredient) {
+                    $qtyRequired = ($ingredient->pivot->quantity_required ?? 0) * $item->quantity;
+
+                    if ($qtyRequired <= 0) continue;
+
+                    // Vérifier le stock disponible
+                    $available = $ingredient->stock_quantity;
+                    if ($available < $qtyRequired) {
+                        $shortages[$ingredient->name] = [
+                            'required' => $qtyRequired,
+                            'available' => $available,
+                            'unit' => $ingredient->unit_of_measure,
+                        ];
+                    }
+
+                    // Déduire (même si ça va en négatif — on trace la rupture)
+                    $ingredient->deduct($qtyRequired, $order->id);
+                }
+
+                // Mettre à jour le coût calculé du produit après chaque vente
+                $product->updateCostAndMargin();
+            }
+        });
+
+        return $shortages;
+    }
+
+    /**
      * Marquer une commande comme "prête" (KDS → caisse notifiée)
      */
     public function markAsReady(Order $order): Order
