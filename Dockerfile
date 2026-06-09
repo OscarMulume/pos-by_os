@@ -22,9 +22,18 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www
 COPY . .
 
+# ── Storage structure (required before composer dump) ──
+RUN mkdir -p storage/framework/cache/data \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache
+
 # ── PHP deps ──
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts \
-    && composer dump-autoload --optimize
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# ── Optimize autoload (triggers package:discover, needs cache dirs) ──
+RUN composer dump-autoload --optimize
 
 # ── Node deps (ignore errors) ──
 RUN npm ci 2>/dev/null && npm run build 2>/dev/null || true
