@@ -1,14 +1,14 @@
 # ═══════════════════════════════════════════════════════════
-# Render.com Blueprint — POS Pro + Supabase
+# Render.com Blueprint — POS Pro v1.3
 # ═══════════════════════════════════════════════════════════
 
 services:
   - type: web
     name: pos-pro-msec
-    runtime: php
+    runtime: docker
     plan: free
-    buildCommand: bash deploy.sh
-    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
+    region: ohio
+    healthCheckPath: /
     envVars:
       - key: APP_ENV
         value: production
@@ -29,7 +29,7 @@ services:
       - key: DB_USERNAME
         value: postgres
       - key: DB_PASSWORD
-        value: "4gdsx?GPJZwEnTV"
+        value: "4gdsx?***"
       - key: SESSION_DRIVER
         value: database
       - key: CACHE_STORE
@@ -38,3 +38,5 @@ services:
         value: database
       - key: FILESYSTEM_DISK
         value: local
+      - key: LOG_CHANNEL
+        value: stderr
