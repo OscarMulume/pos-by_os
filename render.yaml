@@ -19,23 +19,13 @@ services:
       - key: APP_KEY
         value: base64:9aGhanrb73GJt9e0KLHEMKnQbvNSmpzoXUmJhcSLar8=
       - key: DB_CONNECTION
-        value: pgsql
-      - key: DB_HOST
-        value: db.cinzlzdfddvcjhmvnbtp.supabase.co
-      - key: DB_PORT
-        value: "5432"
-      - key: DB_DATABASE
-        value: postgres
-      - key: DB_USERNAME
-        value: postgres
-      - key: DB_PASSWORD
-        value: "4gdsx?***"
+        value: sqlite
       - key: SESSION_DRIVER
-        value: database
+        value: file
       - key: CACHE_STORE
-        value: database
+        value: file
       - key: QUEUE_CONNECTION
-        value: database
+        value: sync
       - key: FILESYSTEM_DISK
         value: local
       - key: LOG_CHANNEL

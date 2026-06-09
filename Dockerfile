@@ -52,10 +52,14 @@ COPY docker/nginx-default /etc/nginx/sites-available/default
 # ── Supervisor ──
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# ── Start script (configures .env + runs migrations) ──
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
 # ── Health check ──
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/ || exit 1
 
 EXPOSE 8080
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/start.sh"]
