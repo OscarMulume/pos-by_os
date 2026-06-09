@@ -9,21 +9,32 @@ services:
     plan: free
     region: ohio
     healthCheckPath: /
+    buildCommand: bash deploy.sh
     envVars:
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
-        value: true
+        value: false
       - key: APP_URL
         value: https://pos-pro-msec.onrender.com
       - key: APP_KEY
         value: base64:9aGhanrb73GJt9e0KLHEMKnQbvNSmpzoXUmJhcSLar8=
       - key: DB_CONNECTION
-        value: sqlite
+        value: pgsql
+      - key: DB_HOST
+        value: aws-0-eu-west-2.pooler.supabase.com
+      - key: DB_PORT
+        value: "6543"
+      - key: DB_DATABASE
+        value: postgres
+      - key: DB_USERNAME
+        value: postgres
+      - key: DB_PASSWORD
+        value: "4gdsx?GPJZwEnTV"
       - key: SESSION_DRIVER
-        value: file
+        value: database
       - key: CACHE_STORE
-        value: file
+        value: database
       - key: QUEUE_CONNECTION
         value: sync
       - key: FILESYSTEM_DISK
