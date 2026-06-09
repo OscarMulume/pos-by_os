@@ -19,5 +19,11 @@ sed -i 's/^APP_DEBUG=.*/APP_DEBUG=true/' .env
 touch /var/www/database/database.sqlite
 chmod 666 /var/www/database/database.sqlite
 
+# Force PHP-FPM to listen on TCP 9000 instead of Unix socket
+echo "listen = 127.0.0.1:9000" >> /usr/local/etc/php-fpm.d/www.conf
+
+echo "=== PHP-FPM config ==="
+grep "listen" /usr/local/etc/php-fpm.d/www.conf
+
 echo "=== Starting supervisord ==="
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
